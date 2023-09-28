@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 
-int handleSend(int argc, char **argv)
+int handleRecv(int argc, char **argv)
 {
     int stat = 500;
     in_addr_t lhost = INADDR_ANY;
@@ -28,7 +28,7 @@ int handleSend(int argc, char **argv)
         }
         else if (strcmp(argv[i], "-lhost") == 0)
         {
-            lhost = (in_addr_t)argv[i + 1];
+            lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
             i++;
         }
         else if (strcmp(argv[i], "-lport") == 0)
