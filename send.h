@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
 
 int handleSend(int argc, char **argv)
 {
@@ -21,50 +23,53 @@ int handleSend(int argc, char **argv)
     // Read options
     for (int i = 2; i < argc; i++)
     {
-        if (strcmp(argv[i], "-stat") == 0)
+        if (i + 1 < argc && argv[i][0] == '-')
         {
-            stat = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-rhost") == 0)
-        {
-            rhost = argv[i + 1];
-            i++;
-        }
-        else if (strcmp(argv[i], "-rport") == 0)
-        {
-            rport = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-proto") == 0)
-        {
-            proto = argv[i + 1];
-            i++;
-        }
-        else if (strcmp(argv[i], "-pktsize") == 0)
-        {
-            pktsize = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-pktrate") == 0)
-        {
-            pktrate = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-pktnum") == 0)
-        {
-            pktnum = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-sbufsize") == 0)
-        {
-            sbufsize = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else
-        {
-            fprintf(stderr, "Unknown option: %s\n", argv[i]);
-            return -1;
+            if (strcmp(argv[i], "-stat") == 0)
+            {
+                stat = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-rhost") == 0)
+            {
+                rhost = argv[i + 1];
+                i++;
+            }
+            else if (strcmp(argv[i], "-rport") == 0)
+            {
+                rport = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-proto") == 0)
+            {
+                proto = argv[i + 1];
+                i++;
+            }
+            else if (strcmp(argv[i], "-pktsize") == 0)
+            {
+                pktsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-pktrate") == 0)
+            {
+                pktrate = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-pktnum") == 0)
+            {
+                pktnum = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-sbufsize") == 0)
+            {
+                sbufsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "Unknown option: %s\n", argv[i]);
+                return -1;
+            }
         }
     }
 
@@ -84,7 +89,8 @@ int handleSend(int argc, char **argv)
     server_addr.sin_addr.s_addr = inet_addr(rhost);
 
     // Connect to the server
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    {
         perror("Connection failed");
         exit(EXIT_FAILURE);
     }
@@ -92,7 +98,8 @@ int handleSend(int argc, char **argv)
     char *message = "message";
 
     // Send data to the server
-    if (send(sockfd, message, strlen(message), 0) == -1) {
+    if (send(sockfd, message, strlen(message), 0) == -1)
+    {
         perror("Send failed");
         exit(EXIT_FAILURE);
     }

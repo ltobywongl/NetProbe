@@ -21,40 +21,43 @@ int handleRecv(int argc, char **argv)
     // Read options
     for (int i = 2; i < argc; i++)
     {
-        if (strcmp(argv[i], "-stat") == 0)
+        if (i + 1 < argc && argv[i][0] == '-')
         {
-            stat = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-lhost") == 0)
-        {
-            lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-lport") == 0)
-        {
-            lport = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-proto") == 0)
-        {
-            proto = argv[i + 1];
-            i++;
-        }
-        else if (strcmp(argv[i], "-pktsize") == 0)
-        {
-            pktsize = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else if (strcmp(argv[i], "-rbufsize") == 0)
-        {
-            rbufsize = strtol(argv[i + 1], &p, 10);
-            i++;
-        }
-        else
-        {
-            fprintf(stderr, "Unknown option: %s\n", argv[i]);
-            return -1;
+            if (strcmp(argv[i], "-stat") == 0)
+            {
+                stat = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-lhost") == 0)
+            {
+                lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-lport") == 0)
+            {
+                lport = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-proto") == 0)
+            {
+                proto = argv[i + 1];
+                i++;
+            }
+            else if (strcmp(argv[i], "-pktsize") == 0)
+            {
+                pktsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-rbufsize") == 0)
+            {
+                rbufsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "Unknown option: %s\n", argv[i]);
+                return -1;
+            }
         }
     }
 
@@ -65,7 +68,8 @@ int handleRecv(int argc, char **argv)
 
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
+    if (sockfd == -1)
+    {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -76,24 +80,28 @@ int handleRecv(int argc, char **argv)
     server_addr.sin_port = htons(lport);
 
     // Bind the socket to the server address
-    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
     // Listen for incoming connections
-    if (listen(sockfd, 1) == -1) {
+    if (listen(sockfd, 1) == -1)
+    {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
 
     printf("Server listening on port %d...\n", lport);
 
-    while (1) {
+    while (1)
+    {
         // Accept a connection from a client
         client_len = sizeof(client_addr);
         newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
-        if (newsockfd == -1) {
+        if (newsockfd == -1)
+        {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
@@ -102,7 +110,8 @@ int handleRecv(int argc, char **argv)
 
         // Receive data from the client
         ssize_t num_bytes = recv(newsockfd, buffer, rbufsize - 1, 0);
-        if (num_bytes == -1) {
+        if (num_bytes == -1)
+        {
             perror("Receive failed");
             exit(EXIT_FAILURE);
         }
