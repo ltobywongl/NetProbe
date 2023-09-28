@@ -1,4 +1,3 @@
 # Project for IERG4180
-TobyWong
-
-1155159363
+## SID: 1155159363
+## Name: Wong Hong To

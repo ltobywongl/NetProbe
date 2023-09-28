@@ -107,7 +107,7 @@ int handleRecv(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        buffer[num_bytes] = '\0'; // Null-terminate the received data
+        buffer[num_bytes] = '\0';
 
         printf("Received message from client: %s\n", buffer);
 
