@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "send.h"
+#include "recv.h"
 
 int main(int argc, char **argv)
 {
