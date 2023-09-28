@@ -14,7 +14,7 @@ int main(int argc, char **argv)
    }
    else if (strcmp(argv[1], "-recv") == 0)
    {
-      // TODO: handleRecv
+      handleStatus = handleRecv(argc, argv);
    }
    else if (strcmp(argv[1], "-host") == 0)
    {
