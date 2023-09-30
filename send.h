@@ -72,7 +72,7 @@ int handleSend(int argc, char **argv)
             }
         }
     }
-    if (rhost == "localhost") rhost = "127.0.0.1";
+    if (rhost == "localhost") strcpy(rhost, "127.0.0.1");
 
     // Handle Socket
     int sockfd;

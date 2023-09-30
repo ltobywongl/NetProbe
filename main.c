@@ -3,6 +3,7 @@
 #include <string.h>
 #include "send.h"
 #include "recv.h"
+#include "host.h"
 
 int main(int argc, char **argv)
 {
@@ -18,7 +19,7 @@ int main(int argc, char **argv)
    }
    else if (strcmp(argv[1], "-host") == 0)
    {
-      // TODO: handleHost
+      handleStatus = handleHost(argc, argv);
    }
 
    exit(0);
