@@ -19,7 +19,7 @@ int handleHost(int argc, char **argv)
     {
         strcpy(pRemoteHost, argv[2]);
     } else if (argc > 3) {
-        fprintf(stderr, "Too many options provided");
+        printf("Too many options provided");
         return -1;
     }
 

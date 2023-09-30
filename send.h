@@ -72,43 +72,92 @@ int handleSend(int argc, char **argv)
             }
         }
     }
-    if (rhost == "localhost") strcpy(rhost, "127.0.0.1");
+    if (strcmp(rhost, "localhost") == 0)
+        rhost = "127.0.0.1";
 
-    // Handle Socket
     int sockfd;
     struct sockaddr_in server_addr;
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
-    {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+    memset(&server_addr, 0, sizeof(struct sockaddr_in));
 
     // Configure server address
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(rport);
     server_addr.sin_addr.s_addr = inet_addr(rhost);
 
-    // Connect to the server
-    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
+    if (strcmp(proto, "UDP") == 0)
     {
-        perror("Connection failed");
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd == -1)
+        {
+            perror("Socket creation failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Send data to the server
+        char *message = "message";
+        long message_len = strlen(message);
+        int bytes_sent = 0;
+        while (bytes_sent < message_len)
+        {
+            int r = sendto(sockfd, message + bytes_sent, message_len - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+            if (r > 0)
+            {
+                bytes_sent += r;
+            }
+            else
+            {
+                perror("Send failed");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        printf("Message sent to the server: %s\n", message);
+
+        // Close the socket
+        close(sockfd);
+    }
+    else if (strcmp(proto, "TCP") == 0)
+    {
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sockfd == -1)
+        {
+            perror("Socket creation failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Connect to the server
+        if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
+        {
+            perror("Connection failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Send data to the server
+        char *message = "message";
+        long message_len = strlen(message);
+        int bytes_sent = 0;
+        while (bytes_sent < message_len)
+        {
+            int r = send(sockfd, message + bytes_sent, message_len - bytes_sent, 0);
+            if (r > 0)
+                bytes_sent += r;
+            else
+            {
+                perror("Send failed");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        printf("Message sent to the server: %s\n", message);
+
+        // Close the socket
+        close(sockfd);
+    }
+    else
+    {
+        fprintf(stderr, "Message send failed");
         exit(EXIT_FAILURE);
     }
-
-    char *message = "message";
-
-    // Send data to the server
-    if (send(sockfd, message, strlen(message), 0) == -1)
-    {
-        perror("Send failed");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Message sent to the server: %s\n", message);
-
-    // Close the socket
-    close(sockfd);
 
     return 0;
 }
