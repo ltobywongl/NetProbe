@@ -72,6 +72,7 @@ int handleSend(int argc, char **argv)
             }
         }
     }
+    if (rhost == "localhost") rhost = "127.0.0.1";
 
     // Handle Socket
     int sockfd;
@@ -89,7 +90,7 @@ int handleSend(int argc, char **argv)
     server_addr.sin_addr.s_addr = inet_addr(rhost);
 
     // Connect to the server
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
     {
         perror("Connection failed");
         exit(EXIT_FAILURE);

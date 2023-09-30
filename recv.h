@@ -63,6 +63,8 @@ int handleRecv(int argc, char **argv)
 
     int sockfd, newsockfd;
     struct sockaddr_in server_addr, client_addr;
+    memset(&server_addr, 0, sizeof(struct sockaddr_in));
+    memset(&client_addr, 0, sizeof(struct sockaddr_in));
     socklen_t client_len;
     char buffer[rbufsize];
 
@@ -80,7 +82,7 @@ int handleRecv(int argc, char **argv)
     server_addr.sin_port = htons(lport);
 
     // Bind the socket to the server address
-    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == -1)
     {
         perror("Bind failed");
         exit(EXIT_FAILURE);
@@ -109,7 +111,7 @@ int handleRecv(int argc, char **argv)
         printf("Client connected: %s\n", inet_ntoa(client_addr.sin_addr));
 
         // Receive data from the client
-        ssize_t num_bytes = recv(newsockfd, buffer, rbufsize - 1, 0);
+        ssize_t num_bytes = recv(newsockfd, buffer, rbufsize, 0);
         if (num_bytes == -1)
         {
             perror("Receive failed");
