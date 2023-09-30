@@ -15,7 +15,7 @@ int handleRecv(int argc, char **argv)
     int lport = 4180;
     char *proto = "UDP";
     int pktsize = 1000;
-    int rbufsize = 64000;
+    int rbufsize = 4096;
     char *p;
 
     // Read options
@@ -155,16 +155,21 @@ int handleRecv(int argc, char **argv)
             printf("Client connected: %s\n", inet_ntoa(client_addr.sin_addr));
 
             // Receive data from the client
-            ssize_t num_bytes = recv(newsockfd, buffer, rbufsize, 0);
-            if (num_bytes == -1)
-            {
-                perror("Receive failed");
-                exit(EXIT_FAILURE);
+            long byte_receive = 0;
+            while (byte_receive < pktsize) {
+                int ret = recv(newsockfd, buffer, rbufsize, 0);
+                if (ret < 0)
+                {
+                    perror("Receive failed");
+                    exit(EXIT_FAILURE);
+                } else {
+                    if (ret == 0) {
+                        break;
+                    } else {
+                        byte_receive += ret;
+                    }
+                }
             }
-
-            buffer[num_bytes] = '\0';
-
-            printf("Received message from client: %s\n", buffer);
 
             // Close the client socket
             close(newsockfd);

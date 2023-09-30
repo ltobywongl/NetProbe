@@ -8,6 +8,17 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 
+char* generateMessage(int length) {
+    char* str = malloc(length + 1);
+    if (str == NULL) {
+        printf("Error: memory allocation failed\n");
+        return NULL;
+    }
+    memset(str, '1', length);
+    str[length] = '\0';
+    return str;
+}
+
 int handleSend(int argc, char **argv)
 {
     int stat = 500;
@@ -17,7 +28,7 @@ int handleSend(int argc, char **argv)
     int pktsize = 1000;
     int pktrate = 1000;
     int pktnum = 0;
-    int sbufsize = 64000;
+    int sbufsize = 4096;
     char *p;
 
     // Read options
@@ -94,7 +105,7 @@ int handleSend(int argc, char **argv)
         }
 
         // Send data to the server
-        char *message = "message";
+        char *message = generateMessage(pktsize);;
         long message_len = strlen(message);
         int bytes_sent = 0;
         while (bytes_sent < message_len)
@@ -133,12 +144,11 @@ int handleSend(int argc, char **argv)
         }
 
         // Send data to the server
-        char *message = "message";
-        long message_len = strlen(message);
+        char *message = generateMessage(pktsize);
         int bytes_sent = 0;
-        while (bytes_sent < message_len)
+        while (bytes_sent < pktsize)
         {
-            int r = send(sockfd, message + bytes_sent, message_len - bytes_sent, 0);
+            int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
             if (r > 0)
                 bytes_sent += r;
             else
@@ -147,8 +157,7 @@ int handleSend(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
         }
-
-        printf("Message sent to the server: %s\n", message);
+        free(message);
 
         // Close the socket
         close(sockfd);
