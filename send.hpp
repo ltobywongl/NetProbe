@@ -1,7 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <cstdlib>
 #include <unistd.h>
-#include <string.h>
+#include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -10,6 +10,10 @@
 
 char *generateMessage(int length, int sequence)
 {
+    if (length <= 0)
+    {
+        std::cout << "Error: generate message length < 0" << std::endl;
+    }
     char *message = (char *)malloc(length * sizeof(char));
     if (sequence == -1)
     {
@@ -23,7 +27,7 @@ char *generateMessage(int length, int sequence)
                 index = 0;
             }
         }
-        message[length - 1] = 0;
+        message[length - 1] = '\0';
         return message;
     }
     else
@@ -48,12 +52,14 @@ char *generateMessage(int length, int sequence)
     }
 }
 
-int handleSend(int argc, char **argv)
+int handleSend(int argc, char *argv[])
 {
     int stat = 500;
-    char *rhost = "localhost";
+    char* rhost = new char[256];
+    strcpy(rhost, "localhost");
     int rport = 4180;
-    char *proto = "UDP";
+    char *proto = new char[4];
+    strcpy(proto, "UDP");
     int pktsize = 1000;
     int pktrate = 1000;
     int pktnum = 0;
@@ -113,7 +119,7 @@ int handleSend(int argc, char **argv)
         }
     }
     if (strcmp(rhost, "localhost") == 0)
-        rhost = "127.0.0.1";
+        strcpy(rhost, "127.0.0.1");
 
     int sockfd;
     struct sockaddr_in server_addr;
@@ -142,7 +148,7 @@ int handleSend(int argc, char **argv)
             char *message = generateMessage(pktsize, msgsent);
             while (bytes_sent < pktsize)
             {
-                if ((bytes_sent < pkt_thresold) || (pkt_thresold = 0))
+                if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
                 {
                     int r = sendto(sockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
                     if (r > 0)
@@ -155,9 +161,9 @@ int handleSend(int argc, char **argv)
                         exit(EXIT_FAILURE);
                     }
                 }
-                msgsent++;
-                free(message);
             }
+            msgsent++;
+            free(message);
         }
 
         // Close the socket
@@ -189,7 +195,7 @@ int handleSend(int argc, char **argv)
             char *message = generateMessage(pktsize, msgsent);
             while (bytes_sent < pktsize)
             {
-                if ((bytes_sent < pkt_thresold) || (pkt_thresold = 0))
+                if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
                 {
                     int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
                     if (r > 0)

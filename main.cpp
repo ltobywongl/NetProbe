@@ -1,11 +1,11 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "send.h"
-#include "recv.h"
-#include "host.h"
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include "send.hpp"
+#include "recv.hpp"
+#include "host.hpp"
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
    int handleStatus = 0;
    // Handle Mode
@@ -22,6 +22,5 @@ int main(int argc, char **argv)
       handleStatus = handleHost(argc, argv);
    }
 
-   exit(0);
+   std::exit(0);
 }
-

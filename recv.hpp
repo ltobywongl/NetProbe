@@ -1,19 +1,31 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include "es_timer.hpp"
 
-int handleRecv(int argc, char **argv)
+double calculateAverageValue(int list[], int count)
+{
+    if (count == 0) return 0;
+    long sum = 0;
+    for (int i = 0; i < count; i++)
+    {
+        sum += list[i];
+    }
+    return (double)sum / count;
+}
+
+int handleRecv(int argc, char *argv[])
 {
     int stat = 500;
     in_addr_t lhost = INADDR_ANY;
     int lport = 4180;
-    char *proto = "UDP";
+    char *proto = const_cast<char *>("UDP");
     int pktsize = 1000;
     int rbufsize = 4096;
     char *p;
@@ -72,7 +84,6 @@ int handleRecv(int argc, char **argv)
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(lport);
-
     if (strcmp(proto, "UDP") == 0)
     {
         // Create socket
@@ -92,9 +103,14 @@ int handleRecv(int argc, char **argv)
 
         printf("Server listening on port %d...\n", lport);
 
+        ES_FlashTimer clock;
+        int packetNum = 0;
+        long previousClock = clock.ElapseduSec();
+        int arrivalTimeList[65536], jitterList[65536];
+        long cumTimeCost = 0, cumBytesReceived = 0;
         while (1)
         {
-            int addr_len = sizeof(client_addr);
+            socklen_t addr_len = sizeof(client_addr);
 
             // Receive data from a client
             int ret = recvfrom(sockfd, buffer, rbufsize - 1, 0, (struct sockaddr *)&client_addr, &addr_len);
@@ -104,10 +120,25 @@ int handleRecv(int argc, char **argv)
                 exit(EXIT_FAILURE);
             }
 
-            // Print the received message and client information
-            printf("Received %d bytes\n", ret);
-            printf("Client address: %s\n", inet_ntoa(client_addr.sin_addr));
-            printf("Client port: %d\n", ntohs(client_addr.sin_port));
+            cumBytesReceived += ret;
+            long currentClock = clock.ElapseduSec();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+
+            arrivalTimeList[packetNum] = timeCost;
+            packetNum++;
+            double averageTime = calculateAverageValue(arrivalTimeList, packetNum);
+            jitterList[packetNum - 1] = timeCost - averageTime;
+            cumTimeCost += timeCost;
+
+            if (cumTimeCost >= stat) {
+                double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
+                double jitter = calculateAverageValue(jitterList, packetNum);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", cumTimeCost, packetNum, throughput, jitter);
+                packetNum = 0;
+                cumTimeCost = 0;
+                cumBytesReceived = 0;
+            }
         }
 
         // Close the server socket

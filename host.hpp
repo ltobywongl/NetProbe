@@ -1,7 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <cstdlib>
 #include <unistd.h>
-#include <string.h>
+#include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -10,7 +10,7 @@
 #include <netinet/ip.h>
 #define MAX_HOSTNAME 128
 
-int handleHost(int argc, char **argv)
+int handleHost(int argc, char *argv[])
 {
     char pRemoteHost[MAX_HOSTNAME] = "localhost"; // Assume hostname stored.
     struct hostent *pHost = NULL;
@@ -55,4 +55,6 @@ int handleHost(int argc, char **argv)
             ptr = pHost->h_addr_list[++i];
         }
     }
+
+    return 0;
 }
