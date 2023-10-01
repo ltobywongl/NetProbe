@@ -162,7 +162,6 @@ int handleSend(int argc, char **argv)
 
         // Close the socket
         close(sockfd);
-
     }
     else if (strcmp(proto, "TCP") == 0)
     {
@@ -182,6 +181,7 @@ int handleSend(int argc, char **argv)
 
         // While need to send
         int msgsent = 0;
+        double pkt_thresold = pktrate * ((double)stat / 1000);
         while (pktnum == 0 || msgsent < pktnum)
         {
             // Send data to the server
@@ -189,13 +189,16 @@ int handleSend(int argc, char **argv)
             char *message = generateMessage(pktsize, msgsent);
             while (bytes_sent < pktsize)
             {
-                int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
-                if (r > 0)
-                    bytes_sent += r;
-                else
+                if ((bytes_sent < pkt_thresold) || (pkt_thresold = 0))
                 {
-                    perror("Send failed");
-                    exit(EXIT_FAILURE);
+                    int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                    if (r > 0)
+                        bytes_sent += r;
+                    else
+                    {
+                        perror("Send failed");
+                        exit(EXIT_FAILURE);
+                    }
                 }
             }
             msgsent++;
