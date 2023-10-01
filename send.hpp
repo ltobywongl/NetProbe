@@ -146,19 +146,19 @@ int handleSend(int argc, char *argv[])
 
         // While need to send
         long msgsent = 0;
-        double pkt_thresold = pktrate * ((double)stat / 1000);
         ES_FlashTimer clock;
         int packetNum = 0;
         long previousClock = clock.Elapsed();
+        long rateLimitClock = clock.Elapsed();
         long initialClock = clock.Elapsed();
-        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0;
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
         while (pktnum == 0 || msgsent < pktnum)
         {
             int bytes_sent = 0;
             char *message = generateMessage(pktsize, msgsent + 1);
             while (bytes_sent < pktsize)
             {
-                if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
+                if ((bytesSentSecond <= pktrate) || (pktrate == 0))
                 {
                     int r = sendto(sockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
                     if (r > 0)
@@ -171,7 +171,13 @@ int handleSend(int argc, char *argv[])
                         exit(EXIT_FAILURE);
                     }
                 }
+                if (clock.Elapsed() - 1000 > rateLimitClock) {
+                    std::cout << "Reset bytesSentSecond" << std::endl;
+                    bytesSentSecond = 0;
+                    rateLimitClock = clock.Elapsed();
+                }
             }
+            bytesSentSecond += bytes_sent;
             cumBytesSent += bytes_sent;
             msgsent++;
             free(message);
@@ -218,12 +224,12 @@ int handleSend(int argc, char *argv[])
 
         // While need to send
         long msgsent = 0;
-        double pkt_thresold = pktrate * ((double)stat / 1000);
         ES_FlashTimer clock;
         int packetNum = 0;
         long previousClock = clock.Elapsed();
+        long rateLimitClock = clock.Elapsed();
         long initialClock = clock.Elapsed();
-        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0;
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
         while (pktnum == 0 || msgsent < pktnum)
         {
             // Send data to the server
@@ -231,7 +237,7 @@ int handleSend(int argc, char *argv[])
             char *message = generateMessage(pktsize, msgsent + 1);
             while (bytes_sent < pktsize)
             {
-                if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
+                if ((bytesSentSecond < pktrate) || (pktrate == 0))
                 {
                     int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
                     if (r > 0)
@@ -242,7 +248,13 @@ int handleSend(int argc, char *argv[])
                         exit(EXIT_FAILURE);
                     }
                 }
+                if (clock.Elapsed() - 1000 > rateLimitClock) {
+                    std::cout << "Reset bytesSentSecond" << std::endl;
+                    bytesSentSecond = 0;
+                    rateLimitClock = clock.Elapsed();
+                }
             }
+            bytesSentSecond += bytes_sent;
             cumBytesSent += bytes_sent;
             msgsent++;
             free(message);
