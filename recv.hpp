@@ -147,7 +147,7 @@ int handleRecv(int argc, char *argv[])
                 int currentPacket = getSequence(buffer);
                 double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
                 double jitter = (double)cumJitter / packetNum;
-                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)packetNum / currentPacket, throughput, jitter);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)(currentPacket - packetNum) / currentPacket, throughput, jitter);
                 statTime = 0;
             }
         }
@@ -195,28 +195,64 @@ int handleRecv(int argc, char *argv[])
             printf("Client connected: %s\n", inet_ntoa(client_addr.sin_addr));
 
             // Receive data from the client
-            long byte_receive = 0;
-            while (1)
+            ES_FlashTimer clock;
+            short exitFlag = 0;
+            int packetNum = 0;
+            long previousClock = clock.Elapsed();
+            long initialClock = clock.Elapsed();
+            long cumTimeCost = 0, cumBytesReceived = 0, statTime = 0, cumJitter = 0;
+            while (exitFlag == 0)
             {
-                int ret = recv(newsockfd, buffer, rbufsize, 0);
-                if (ret < 0)
-                {
-                    perror("Receive failed");
-                    exit(EXIT_FAILURE);
-                }
-                else
-                {
-                    if (ret == 0)
+                long bytesReceived = 0;
+                while (bytesReceived < pktsize) {
+                    int ret = recv(newsockfd, buffer, pktsize - bytesReceived, 0);
+                    if (ret == -1)
                     {
-                        printf("Client Disconnected\n");
+                        perror("Receive failed");
+                        sleep(3);
                         break;
                     }
                     else
                     {
-                        byte_receive += ret;
+                        if (ret == 0)
+                        {
+                            printf("Client Disconnected\n");
+                            exitFlag = 1;
+                            break;
+                        }
+                        else
+                        {
+                            bytesReceived += ret;
+                        }
                     }
                 }
-                printf("Received %d bytes\n", ret);
+                if (exitFlag == 1) break;
+                cumBytesReceived += bytesReceived;
+
+                // Handle time
+                long currentClock = clock.Elapsed();
+                double timeCost = currentClock - previousClock;
+                previousClock = currentClock;
+                cumTimeCost += timeCost;
+
+                // Calculate
+                packetNum++;
+                double averageTime = 0;
+                if (cumTimeCost > 0)
+                    averageTime = cumTimeCost / packetNum;
+                cumJitter += timeCost - averageTime;
+
+                // Stats
+                statTime += timeCost;
+
+                if (statTime >= stat)
+                {
+                    int currentPacket = getSequence(buffer);
+                    double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
+                    double jitter = (double)cumJitter / packetNum;
+                    printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)(currentPacket - packetNum) / currentPacket, throughput, jitter);
+                    statTime = 0;
+                }
             }
 
             // Close the client socket

@@ -145,7 +145,7 @@ int handleSend(int argc, char *argv[])
         while (pktnum == 0 || msgsent < pktnum)
         {
             int bytes_sent = 0;
-            char *message = generateMessage(pktsize, msgsent);
+            char *message = generateMessage(pktsize, msgsent + 1);
             while (bytes_sent < pktsize)
             {
                 if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
@@ -192,7 +192,7 @@ int handleSend(int argc, char *argv[])
         {
             // Send data to the server
             int bytes_sent = 0;
-            char *message = generateMessage(pktsize, msgsent);
+            char *message = generateMessage(pktsize, msgsent + 1);
             while (bytes_sent < pktsize)
             {
                 if ((bytes_sent < pkt_thresold) || (pkt_thresold == 0))
