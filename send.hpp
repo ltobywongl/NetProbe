@@ -140,6 +140,10 @@ int handleSend(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1) {
+            perror("Error setting socket buffer size");
+        }
+
         // While need to send
         long msgsent = 0;
         double pkt_thresold = pktrate * ((double)stat / 1000);
@@ -199,6 +203,10 @@ int handleSend(int argc, char *argv[])
         {
             perror("Socket creation failed");
             exit(EXIT_FAILURE);
+        }
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1) {
+            perror("Error setting socket buffer size");
         }
 
         // Connect to the server

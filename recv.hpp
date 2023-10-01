@@ -83,7 +83,7 @@ int handleRecv(int argc, char *argv[])
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
     memset(&client_addr, 0, sizeof(struct sockaddr_in));
     socklen_t client_len;
-    char buffer[rbufsize];
+    char buffer[pktsize];
 
     // Configure server address
     server_addr.sin_family = AF_INET;
@@ -97,6 +97,10 @@ int handleRecv(int argc, char *argv[])
         {
             perror("Socket creation failed");
             exit(EXIT_FAILURE);
+        }
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &rbufsize, sizeof(rbufsize)) == -1) {
+            perror("Error setting socket buffer size");
         }
 
         // Bind the socket to the server address
@@ -163,6 +167,10 @@ int handleRecv(int argc, char *argv[])
         {
             perror("Socket creation failed");
             exit(EXIT_FAILURE);
+        }
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &rbufsize, sizeof(rbufsize)) == -1) {
+            perror("Error setting socket buffer size");
         }
 
         // Bind the socket to the server address
