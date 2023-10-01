@@ -97,17 +97,15 @@ int handleRecv(int argc, char **argv)
             int addr_len = sizeof(client_addr);
 
             // Receive data from a client
-            ssize_t num_bytes = recvfrom(sockfd, buffer, rbufsize - 1, 0, (struct sockaddr *)&client_addr, &addr_len);
-            if (num_bytes == -1)
+            int ret = recvfrom(sockfd, buffer, rbufsize - 1, 0, (struct sockaddr *)&client_addr, &addr_len);
+            if (ret == -1)
             {
                 perror("Receive failed");
                 exit(EXIT_FAILURE);
             }
 
-            buffer[num_bytes] = '\0'; // Null-terminate the received data
-
             // Print the received message and client information
-            printf("Received message: %s\n", buffer);
+            printf("Received %d bytes\n", ret);
             printf("Client address: %s\n", inet_ntoa(client_addr.sin_addr));
             printf("Client port: %d\n", ntohs(client_addr.sin_port));
         }
@@ -156,19 +154,27 @@ int handleRecv(int argc, char **argv)
 
             // Receive data from the client
             long byte_receive = 0;
-            while (byte_receive < pktsize) {
+            while (1)
+            {
                 int ret = recv(newsockfd, buffer, rbufsize, 0);
                 if (ret < 0)
                 {
                     perror("Receive failed");
                     exit(EXIT_FAILURE);
-                } else {
-                    if (ret == 0) {
+                }
+                else
+                {
+                    if (ret == 0)
+                    {
+                        printf("Client Disconnected\n");
                         break;
-                    } else {
+                    }
+                    else
+                    {
                         byte_receive += ret;
                     }
                 }
+                printf("Received %d bytes\n", ret);
             }
 
             // Close the client socket

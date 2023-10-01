@@ -8,9 +8,11 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 
-char* generateMessage(int length) {
-    char* str = malloc(length + 1);
-    if (str == NULL) {
+char *generateMessage(int length)
+{
+    char *str = malloc(length + 1);
+    if (str == NULL)
+    {
         printf("Error: memory allocation failed\n");
         return NULL;
     }
@@ -104,28 +106,38 @@ int handleSend(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        // Send data to the server
-        char *message = generateMessage(pktsize);;
-        long message_len = strlen(message);
-        int bytes_sent = 0;
-        while (bytes_sent < message_len)
-        {
-            int r = sendto(sockfd, message + bytes_sent, message_len - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-            if (r > 0)
-            {
-                bytes_sent += r;
-            }
-            else
-            {
-                perror("Send failed");
-                exit(EXIT_FAILURE);
-            }
-        }
+        // Pregenerate Message
+        char *message = generateMessage(pktsize);
+        printf("Message size: %d\n", pktsize);
 
-        printf("Message sent to the server: %s\n", message);
+        // While need to send
+        int msgsent = 0;
+        while (pktnum == 0 || msgsent < pktnum)
+        {
+            // Send data to the server
+            int bytes_sent = 0;
+            while (bytes_sent < pktsize)
+            {
+                int r = sendto(sockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                if (r > 0)
+                {
+                    bytes_sent += r;
+                }
+                else
+                {
+                    perror("Send failed");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            if (pktnum != 0)
+                msgsent++;
+        }
 
         // Close the socket
         close(sockfd);
+
+        // Free
+        free(message);
     }
     else if (strcmp(proto, "TCP") == 0)
     {
@@ -143,24 +155,36 @@ int handleSend(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        // Send data to the server
+        // Pregenerate Message
         char *message = generateMessage(pktsize);
-        int bytes_sent = 0;
-        while (bytes_sent < pktsize)
+        printf("Message size: %d\n", pktsize);
+
+        // While need to send
+        int msgsent = 0;
+        while (pktnum == 0 || msgsent < pktnum)
         {
-            int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
-            if (r > 0)
-                bytes_sent += r;
-            else
+            // Send data to the server
+            int bytes_sent = 0;
+            while (bytes_sent < pktsize)
             {
-                perror("Send failed");
-                exit(EXIT_FAILURE);
+                int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                if (r > 0)
+                    bytes_sent += r;
+                else
+                {
+                    perror("Send failed");
+                    exit(EXIT_FAILURE);
+                }
             }
+            if (pktnum != 0)
+                msgsent++;
         }
-        free(message);
 
         // Close the socket
         close(sockfd);
+
+        // Free
+        free(message);
     }
     else
     {
