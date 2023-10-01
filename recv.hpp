@@ -9,7 +9,7 @@
 #include <netinet/ip.h>
 #include "es_timer.hpp"
 
-int getSequence(char *message)
+long getSequence(char *message)
 {
     char sequence[16];
     strncpy(sequence, message, 15);
@@ -19,7 +19,6 @@ int getSequence(char *message)
         if (sequence[i] == '#')
         {
             sequence[i] = '\0';
-            break;
         }
     }
     return std::stoi(sequence);
@@ -32,7 +31,7 @@ int handleRecv(int argc, char *argv[])
     int lport = 4180;
     char *proto = const_cast<char *>("UDP");
     int pktsize = 1000;
-    int rbufsize = 4096;
+    int rbufsize = 65536;
     char *p;
 
     // Read options
@@ -148,10 +147,10 @@ int handleRecv(int argc, char *argv[])
 
             if (statTime >= stat)
             {
-                int currentPacket = getSequence(buffer);
+                long currentPacket = getSequence(buffer);
                 double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
                 double jitter = (double)cumJitter / packetNum;
-                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %ld, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
                 statTime = 0;
             }
         }
@@ -255,10 +254,10 @@ int handleRecv(int argc, char *argv[])
 
                 if (statTime >= stat)
                 {
-                    int currentPacket = getSequence(buffer);
+                    long currentPacket = getSequence(buffer);
                     double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
                     double jitter = (double)cumJitter / packetNum;
-                    printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
+                    printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %ld, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
                     statTime = 0;
                 }
             }

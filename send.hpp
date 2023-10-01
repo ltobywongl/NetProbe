@@ -64,7 +64,7 @@ int handleSend(int argc, char *argv[])
     int pktsize = 1000;
     int pktrate = 1000;
     int pktnum = 0;
-    int sbufsize = 4096;
+    int sbufsize = 65536;
     char *p;
 
     // Read options
@@ -172,7 +172,6 @@ int handleSend(int argc, char *argv[])
                     }
                 }
                 if (clock.Elapsed() - 1000 > rateLimitClock) {
-                    std::cout << "Reset bytesSentSecond" << std::endl;
                     bytesSentSecond = 0;
                     rateLimitClock = clock.Elapsed();
                 }
@@ -249,7 +248,6 @@ int handleSend(int argc, char *argv[])
                     }
                 }
                 if (clock.Elapsed() - 1000 > rateLimitClock) {
-                    std::cout << "Reset bytesSentSecond" << std::endl;
                     bytesSentSecond = 0;
                     rateLimitClock = clock.Elapsed();
                 }

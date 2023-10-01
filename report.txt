@@ -1,0 +1,38 @@
+Project Experiments
+
+1. Measure the throughput, delay jitter, and CPU utilization versus packet size (2n bytes, n=6, 8, 10, 12, 13, 14, 15) using the TCP protocol.
+
+With buffer size set to 65536, the measurings are as follow. The throughput and delay jitter increases as the packet size go.
+322.22  Mbps, 0.001589 ms
+799.47  Mbps, 0.002562 ms
+1901.07 Mbps, 0.004309 ms
+2791.04 Mbps, 0.011740 ms
+3034.00 Mbps, 0.021601 ms
+3206.77 Mbps, 0.040874 ms
+3409.81 Mbps, 0.076879 ms
+
+2. Repeat (1) using the UDP protocol. Plot also the packet loss rate versus packet size.
+
+With buffer size set to 65536, the measurings are as follow. The throughput, delay jitter increases as the packet size go. However, the loss rate seems to be decreasing as the packet size increase. It might be due to the packet rate decreased as the packet size increase.
+
+157.49 Mbps,  0.002396 ms,  5.47%
+485.16 Mbps,  0.002599 ms,  4.09%
+873.58 Mbps,  0.008664 ms,  4.57%
+1341.25 Mbps, 0.012293 ms,  3.92%
+1764.36 Mbps, 0.032473 ms,  4.26%
+2464.05 Mbps, -0.027426 ms, 2.00%
+1652.90 Mbps, -0.007029 ms, 2.17%
+
+3. Explore the impact of receiver socket buffer size on achievable throughput and packet loss rate.
+
+With message size set to 256 bytes and UDP as the protocol, the packet loss rate doesn't seems to have much of a relationship with the receiver socket buffer.
+
+Buffer size | Loss rate
+64          | 3.87%
+128         | 4.35%
+256         | 3.64%
+512         | 3.30%
+1024        | 3.97%
+4096        | 4.12%
+8192        | 3.55%
+16384       | 3.31%
