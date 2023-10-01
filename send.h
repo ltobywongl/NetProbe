@@ -8,17 +8,44 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 
-char *generateMessage(int length)
+char *generateMessage(int length, int sequence)
 {
-    char *str = malloc(length + 1);
-    if (str == NULL)
+    char *message = (char *)malloc(length * sizeof(char));
+    if (sequence == -1)
     {
-        printf("Error: memory allocation failed\n");
-        return NULL;
+        int index = 0;
+        for (int i = 0; i < length; i++)
+        {
+            message[i] = '0' + index;
+            index = index + 1;
+            if (index == 10)
+            {
+                index = 0;
+            }
+        }
+        message[length - 1] = 0;
+        return message;
     }
-    memset(str, '1', length);
-    str[length] = '\0';
-    return str;
+    else
+    {
+        sprintf(message, "%d", sequence);
+        int flag = 0;
+        for (int i = 0; i < length; i++)
+        {
+            if (message[i] == 0)
+            {
+                flag = 1;
+                message[i] = '#';
+                continue;
+            }
+            if (flag == 1)
+            {
+                message[i] = '0';
+            }
+        }
+        message[length - 1] = 0;
+        return message;
+    }
 }
 
 int handleSend(int argc, char **argv)
@@ -106,38 +133,36 @@ int handleSend(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        // Pregenerate Message
-        char *message = generateMessage(pktsize);
-        printf("Message size: %d\n", pktsize);
-
         // While need to send
-        int msgsent = 0;
+        long msgsent = 0;
+        double pkt_thresold = pktrate * ((double)stat / 1000);
         while (pktnum == 0 || msgsent < pktnum)
         {
-            // Send data to the server
             int bytes_sent = 0;
+            char *message = generateMessage(pktsize, msgsent);
             while (bytes_sent < pktsize)
             {
-                int r = sendto(sockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                if (r > 0)
+                if ((bytes_sent < pkt_thresold) || (pkt_thresold = 0))
                 {
-                    bytes_sent += r;
+                    int r = sendto(sockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                    if (r > 0)
+                    {
+                        bytes_sent += r;
+                    }
+                    else
+                    {
+                        perror("Send failed");
+                        exit(EXIT_FAILURE);
+                    }
                 }
-                else
-                {
-                    perror("Send failed");
-                    exit(EXIT_FAILURE);
-                }
-            }
-            if (pktnum != 0)
                 msgsent++;
+                free(message);
+            }
         }
 
         // Close the socket
         close(sockfd);
 
-        // Free
-        free(message);
     }
     else if (strcmp(proto, "TCP") == 0)
     {
@@ -155,16 +180,13 @@ int handleSend(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        // Pregenerate Message
-        char *message = generateMessage(pktsize);
-        printf("Message size: %d\n", pktsize);
-
         // While need to send
         int msgsent = 0;
         while (pktnum == 0 || msgsent < pktnum)
         {
             // Send data to the server
             int bytes_sent = 0;
+            char *message = generateMessage(pktsize, msgsent);
             while (bytes_sent < pktsize)
             {
                 int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
@@ -176,15 +198,12 @@ int handleSend(int argc, char **argv)
                     exit(EXIT_FAILURE);
                 }
             }
-            if (pktnum != 0)
-                msgsent++;
+            msgsent++;
+            free(message);
         }
 
         // Close the socket
         close(sockfd);
-
-        // Free
-        free(message);
     }
     else
     {
