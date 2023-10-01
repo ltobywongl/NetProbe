@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include "es_timer.hpp"
 
 char *generateMessage(int length, int sequence)
 {
@@ -142,6 +143,11 @@ int handleSend(int argc, char *argv[])
         // While need to send
         long msgsent = 0;
         double pkt_thresold = pktrate * ((double)stat / 1000);
+        ES_FlashTimer clock;
+        int packetNum = 0;
+        long previousClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0;
         while (pktnum == 0 || msgsent < pktnum)
         {
             int bytes_sent = 0;
@@ -162,8 +168,25 @@ int handleSend(int argc, char *argv[])
                     }
                 }
             }
+            cumBytesSent += bytes_sent;
             msgsent++;
             free(message);
+
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                statTime = 0;
+            }
         }
 
         // Close the socket
@@ -186,8 +209,13 @@ int handleSend(int argc, char *argv[])
         }
 
         // While need to send
-        int msgsent = 0;
+        long msgsent = 0;
         double pkt_thresold = pktrate * ((double)stat / 1000);
+        ES_FlashTimer clock;
+        int packetNum = 0;
+        long previousClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0;
         while (pktnum == 0 || msgsent < pktnum)
         {
             // Send data to the server
@@ -207,8 +235,25 @@ int handleSend(int argc, char *argv[])
                     }
                 }
             }
+            cumBytesSent += bytes_sent;
             msgsent++;
             free(message);
+
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                statTime = 0;
+            }
         }
 
         // Close the socket
