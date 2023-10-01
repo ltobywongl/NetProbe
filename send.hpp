@@ -36,7 +36,7 @@ char *generateMessage(int length, int sequence)
         int flag = 0;
         for (int i = 0; i < length; i++)
         {
-            if (message[i] == 0)
+            if (message[i] == '\0')
             {
                 flag = 1;
                 message[i] = '#';
@@ -47,7 +47,7 @@ char *generateMessage(int length, int sequence)
                 message[i] = '0';
             }
         }
-        message[length - 1] = 0;
+        message[length - 1] = '\0';
         return message;
     }
 }

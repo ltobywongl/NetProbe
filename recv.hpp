@@ -9,15 +9,20 @@
 #include <netinet/ip.h>
 #include "es_timer.hpp"
 
-double calculateAverageValue(int list[], int count)
+int getSequence(char *message)
 {
-    if (count == 0) return 0;
-    long sum = 0;
-    for (int i = 0; i < count; i++)
+    char sequence[16];
+    strncpy(sequence, message, 15);
+    sequence[15] = '\0';
+    for (int i = 0; i < 15; i++)
     {
-        sum += list[i];
+        if (sequence[i] == '#')
+        {
+            sequence[i] = '\0';
+            break;
+        }
     }
-    return (double)sum / count;
+    return std::stoi(sequence);
 }
 
 int handleRecv(int argc, char *argv[])
@@ -105,9 +110,9 @@ int handleRecv(int argc, char *argv[])
 
         ES_FlashTimer clock;
         int packetNum = 0;
-        long previousClock = clock.ElapseduSec();
-        int arrivalTimeList[65536], jitterList[65536];
-        long cumTimeCost = 0, cumBytesReceived = 0;
+        long previousClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesReceived = 0, statTime = 0, cumJitter = 0;
         while (1)
         {
             socklen_t addr_len = sizeof(client_addr);
@@ -119,25 +124,31 @@ int handleRecv(int argc, char *argv[])
                 perror("Receive failed");
                 exit(EXIT_FAILURE);
             }
-
             cumBytesReceived += ret;
-            long currentClock = clock.ElapseduSec();
+
+            // Handle time
+            long currentClock = clock.Elapsed();
             double timeCost = currentClock - previousClock;
             previousClock = currentClock;
-
-            arrivalTimeList[packetNum] = timeCost;
-            packetNum++;
-            double averageTime = calculateAverageValue(arrivalTimeList, packetNum);
-            jitterList[packetNum - 1] = timeCost - averageTime;
             cumTimeCost += timeCost;
 
-            if (cumTimeCost >= stat) {
+            // Calculate
+            packetNum++;
+            double averageTime = 0;
+            if (cumTimeCost > 0)
+                averageTime = cumTimeCost / packetNum;
+            cumJitter += timeCost - averageTime;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                int currentPacket = getSequence(buffer);
                 double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
-                double jitter = calculateAverageValue(jitterList, packetNum);
-                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", cumTimeCost, packetNum, throughput, jitter);
-                packetNum = 0;
-                cumTimeCost = 0;
-                cumBytesReceived = 0;
+                double jitter = (double)cumJitter / packetNum;
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %d, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)packetNum / currentPacket, throughput, jitter);
+                statTime = 0;
             }
         }
 
