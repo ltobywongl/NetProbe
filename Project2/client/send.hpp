@@ -155,7 +155,7 @@ int handleSend(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int r = send(sockfd, "TCP", 3, 0);
+    int r = send(sockfd, "10", 2, 0);
     if (r <= 0)
     {
         perror("Send failed");
