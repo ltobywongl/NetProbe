@@ -3,7 +3,8 @@
 #include <cstring>
 #include "send.hpp"
 #include "recv.hpp"
-#include "host.hpp"
+
+using namespace std;
 
 int main(int argc, char *argv[])
 {
@@ -18,5 +19,5 @@ int main(int argc, char *argv[])
       handleStatus = handleRecv(argc, argv);
    }
 
-   std::exit(0);
+   exit(0);
 }
