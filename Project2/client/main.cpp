@@ -9,6 +9,10 @@ using namespace std;
 int main(int argc, char *argv[])
 {
    int handleStatus = 0;
+   if (argc == 1) {
+      cout << "Please set the client mode" << endl;
+      exit(EXIT_FAILURE);
+   }
    // Handle Mode
    if (strcmp(argv[1], "-send") == 0)
    {

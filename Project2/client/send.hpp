@@ -9,11 +9,13 @@
 #include <netinet/ip.h>
 #include "es_timer.hpp"
 
+using namespace std;
+
 char *generateMessage(int length, int sequence)
 {
     if (length <= 0)
     {
-        std::cout << "Error: generate message length < 0" << std::endl;
+        cout << "Error: generate message length < 0" << endl;
     }
     char *message = (char *)malloc(length * sizeof(char));
     if (sequence == -1)
@@ -155,7 +157,7 @@ int handleSend(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int r = send(sockfd, "10", 2, 0);
+    int r = send(sockfd, "101000", 7, 0);
     if (r <= 0)
     {
         perror("Send failed");
