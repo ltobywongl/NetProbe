@@ -58,7 +58,7 @@ char *generateMessage(int length, int sequence)
 int handleSend(int argc, char *argv[])
 {
     int stat = 500;
-    char* rhost = new char[256];
+    char *rhost = new char[256];
     strcpy(rhost, "localhost");
     int rport = 4180;
     char *proto = new char[4];
@@ -146,7 +146,8 @@ int handleSend(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1) {
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
+    {
         perror("Error setting socket buffer size");
     }
 
@@ -163,7 +164,61 @@ int handleSend(int argc, char *argv[])
         perror("Send failed");
         exit(EXIT_FAILURE);
     }
-    
+
+    // While need to send
+    long msgsent = 0;
+    ES_FlashTimer clock;
+    int packetNum = 0;
+    long previousClock = clock.Elapsed();
+    long rateLimitClock = clock.Elapsed();
+    long initialClock = clock.Elapsed();
+    long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
+    while (pktnum == 0 || msgsent < pktnum)
+    {
+        // Send data to the server
+        int bytes_sent = 0;
+        char *message = generateMessage(pktsize, msgsent + 1);
+        while (bytes_sent < pktsize)
+        {
+            if ((bytesSentSecond < pktrate) || (pktrate == 0))
+            {
+                int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                if (r > 0)
+                    bytes_sent += r;
+                else
+                {
+                    perror("Send failed");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            if (clock.Elapsed() - 1000 > rateLimitClock)
+            {
+                bytesSentSecond = 0;
+                rateLimitClock = clock.Elapsed();
+            }
+        }
+        bytesSentSecond += bytes_sent;
+        cumBytesSent += bytes_sent;
+        msgsent++;
+        free(message);
+
+        // Handle time
+        long currentClock = clock.Elapsed();
+        double timeCost = currentClock - previousClock;
+        previousClock = currentClock;
+        cumTimeCost += timeCost;
+
+        // Stats
+        statTime += timeCost;
+
+        if (statTime >= stat)
+        {
+            double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
+            printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+            statTime = 0;
+        }
+    }
+
     close(sockfd);
 
     return 0;

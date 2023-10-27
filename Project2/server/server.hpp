@@ -14,50 +14,47 @@
 #define TIMEOUT_SECONDS 10
 
 using namespace std;
-struct ThreadData {
+struct ThreadData
+{
     int params;
     int sockfd;
     int pktrate;
+    int bufsize;
 };
 
-void *handleConnection(void *parameter) {
-    ThreadData* data = reinterpret_cast<ThreadData*>(parameter);
+void *handleConnection(void *parameter)
+{
+    ThreadData *data = reinterpret_cast<ThreadData *>(parameter);
     int params = data->params;
     int sockfd = data->sockfd;
     int pktrate = data->pktrate;
+    short exitFlag = 0;
+    char buffer[data->bufsize];
     cout << "Received: " << params << " " << sockfd << " " << pktrate << endl;
 
-    // Start with 1 then SOCK_DGRAM, 0 then SOCK_STREAM
-    int socketType = params/10;
-
-    // if (socketType == 1) {
-    //     int newsock = socket(AF_INET, SOCK_STREAM, 0);
-    //     if (newsock == -1) {
-    //         perror("Socket creation failed");
-    //         close(sockfd);
-    //         pthread_exit(nullptr);
-    //     }
-
-    //     char buffer[1024];
-    //     memset(buffer, 0, sizeof(buffer));
-
-    //     // Receive data from the client
-    //     int bytesRead = recv(sockfd, buffer, 1023, 0);
-    //     if (bytesRead > 0) {
-    //         cout << "Received data from client: " << settings << sockfd << endl;
-    //     } else if (bytesRead == 0) {
-    //         cout << "Client disconnected." << endl;
-    //     } else {
-    //         perror("Receive failed");
-    //     }
-    // } else {
-    //     int newsock = socket(AF_INET, SOCK_DGRAM, 0);
-    //     if (newsock == -1) {
-    //         perror("Socket creation failed");
-    //         close(sockfd);
-    //         pthread_exit(nullptr);
-    //     }
-    // }
+    while (exitFlag == 0)
+    {
+        long bytesReceived = 0;
+        while (bytesReceived < data->bufsize)
+        {
+            int ret = recv(sockfd, buffer, data->bufsize - bytesReceived, 0);
+            if (ret == -1)
+            {
+                perror("Receive failed");
+                break;
+            }
+            else if (ret == 0)
+            {
+                printf("Client Disconnected\n");
+                exitFlag = 1;
+                break;
+            }
+            bytesReceived += ret;
+            cout << buffer << endl;
+        }
+        if (exitFlag == 1)
+            break;
+    }
 
     cout << "Closing Socket..." << endl;
     close(sockfd);
@@ -146,24 +143,31 @@ int handleServer(int argc, char *argv[])
     cout << "Listening to incoming connection request ... " << endl;
 
     // Accept TCP connection to receive settings
-    while (true) {
+    while (true)
+    {
         socklen_t client_addr_len = sizeof(client_addr);
         int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (newsockfd < 0) {
+        if (newsockfd < 0)
+        {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
-        
+
         char buffer[16];
         memset(buffer, 0, sizeof(buffer));
 
         // Receive data from the client
         int bytesRead = recv(newsockfd, buffer, 16, 0);
-        if (bytesRead > 0) {
+        if (bytesRead > 0)
+        {
             cout << "Received data from client: " << buffer << endl;
-        } else if (bytesRead == 0) {
+        }
+        else if (bytesRead == 0)
+        {
             cout << "Client disconnected." << endl;
-        } else {
+        }
+        else
+        {
             perror("Receive failed");
         }
 
@@ -173,7 +177,8 @@ int handleServer(int argc, char *argv[])
         int pktrate = strtol((buffer + 2), &p, 10);
         cout << params << " " << pktrate << endl;
 
-        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 || strcmp(params, "00") == 0 || strcmp(params, "11") == 0)) {
+        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 || strcmp(params, "00") == 0 || strcmp(params, "11") == 0))
+        {
             cout << "Wrong parameter format" << endl;
             close(newsockfd);
             continue;
@@ -183,10 +188,12 @@ int handleServer(int argc, char *argv[])
         data.params = strtol(params, &p, 10);
         data.sockfd = newsockfd;
         data.pktrate = pktrate;
+        data.bufsize = (data.params % 10) ? rbufsize : sbufsize;
 
         pthread_t client_thread;
         int create_thread = pthread_create(&client_thread, nullptr, handleConnection, &data);
-        if (create_thread != 0) {
+        if (create_thread != 0)
+        {
             cout << "Failed to create thread" << endl;
             close(newsockfd);
             continue;
