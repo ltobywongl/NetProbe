@@ -22,6 +22,21 @@ struct ThreadData
     int bufsize;
 };
 
+long getSequence(char *message)
+{
+    char sequence[16];
+    strncpy(sequence, message, 15);
+    sequence[15] = '\0';
+    for (int i = 0; i < 15; i++)
+    {
+        if (sequence[i] == '#')
+        {
+            sequence[i] = '\0';
+        }
+    }
+    return std::stoi(sequence);
+}
+
 void *handleConnection(void *parameter)
 {
     ThreadData *data = reinterpret_cast<ThreadData *>(parameter);
@@ -50,7 +65,7 @@ void *handleConnection(void *parameter)
                 break;
             }
             bytesReceived += ret;
-            cout << buffer << endl;
+            cout << sockfd << ": " << getSequence(buffer) << endl;
         }
         if (exitFlag == 1)
             break;
