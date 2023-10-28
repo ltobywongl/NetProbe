@@ -11,6 +11,7 @@
 
 long getSequence(char *message)
 {
+    char *p;
     char sequence[16];
     strncpy(sequence, message, 15);
     sequence[15] = '\0';
@@ -19,9 +20,10 @@ long getSequence(char *message)
         if (sequence[i] == '#')
         {
             sequence[i] = '\0';
+            break;
         }
     }
-    return std::stoi(sequence);
+    return strtol(sequence, &p, 10);
 }
 
 int handleRecv(int argc, char *argv[])
@@ -154,7 +156,7 @@ int handleRecv(int argc, char *argv[])
 
         // Configure server address
         client_udp_addr.sin_family = AF_INET;
-        client_udp_addr.sin_port = htons(rport);
+        client_udp_addr.sin_port = htons(rport+1);
         client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
 
         // Bind the socket to the address and port
