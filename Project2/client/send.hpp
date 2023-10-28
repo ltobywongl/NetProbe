@@ -200,7 +200,8 @@ int handleSend(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1) {
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
+        {
             perror("Error setting socket buffer size");
         }
 
@@ -231,7 +232,8 @@ int handleSend(int argc, char *argv[])
                         exit(EXIT_FAILURE);
                     }
                 }
-                if (clock.Elapsed() - 1000 > rateLimitClock) {
+                if (clock.Elapsed() - 1000 > rateLimitClock)
+                {
                     bytesSentSecond = 0;
                     rateLimitClock = clock.Elapsed();
                 }
@@ -257,7 +259,9 @@ int handleSend(int argc, char *argv[])
                 statTime = 0;
             }
         }
-    } else {
+    }
+    else
+    {
         // TCP
         int r = send(sockfd, "001000", 7, 0);
         if (r <= 0)

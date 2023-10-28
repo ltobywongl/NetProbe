@@ -27,10 +27,15 @@ long getSequence(char *message)
 int handleRecv(int argc, char *argv[])
 {
     int stat = 500;
-    in_addr_t lhost = INADDR_ANY;
-    int lport = 4180;
-    char *proto = const_cast<char *>("UDP");
+    char *rhost = new char[256];
+    strcpy(rhost, "localhost");
+    int rport = 4180;
+    char *proto = new char[4];
+    strcpy(proto, "UDP");
     int pktsize = 1000;
+    int pktrate = 1000;
+    int pktnum = 0;
+    int sbufsize = 65536;
     int rbufsize = 65536;
     char *p;
 
@@ -44,14 +49,14 @@ int handleRecv(int argc, char *argv[])
                 stat = strtol(argv[i + 1], &p, 10);
                 i++;
             }
-            else if (strcmp(argv[i], "-lhost") == 0)
+            else if (strcmp(argv[i], "-rhost") == 0)
             {
-                lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
+                rhost = argv[i + 1];
                 i++;
             }
-            else if (strcmp(argv[i], "-lport") == 0)
+            else if (strcmp(argv[i], "-rport") == 0)
             {
-                lport = strtol(argv[i + 1], &p, 10);
+                rport = strtol(argv[i + 1], &p, 10);
                 i++;
             }
             else if (strcmp(argv[i], "-proto") == 0)
@@ -64,6 +69,21 @@ int handleRecv(int argc, char *argv[])
                 pktsize = strtol(argv[i + 1], &p, 10);
                 i++;
             }
+            else if (strcmp(argv[i], "-pktrate") == 0)
+            {
+                pktrate = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-pktnum") == 0)
+            {
+                pktnum = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-sbufsize") == 0)
+            {
+                sbufsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
             else if (strcmp(argv[i], "-rbufsize") == 0)
             {
                 rbufsize = strtol(argv[i + 1], &p, 10);
@@ -71,46 +91,82 @@ int handleRecv(int argc, char *argv[])
             }
             else
             {
-                printf("Unknown option: %s\n", argv[i]);
+                fprintf(stderr, "Unknown option: %s\n", argv[i]);
                 return -1;
             }
         }
     }
+    if (strcmp(rhost, "localhost") == 0)
+        strcpy(rhost, "127.0.0.1");
 
-    int sockfd, newsockfd;
-    struct sockaddr_in server_addr, client_addr;
+    int sockfd;
+    struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
-    memset(&client_addr, 0, sizeof(struct sockaddr_in));
-    socklen_t client_len;
-    char buffer[pktsize];
 
     // Configure server address
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(lport);
+    server_addr.sin_port = htons(rport);
+    server_addr.sin_addr.s_addr = inet_addr(rhost);
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
+    {
+        perror("Error setting socket buffer size");
+    }
+
+    // Connect to the server
+    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
+    {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+
     if (strcmp(proto, "UDP") == 0)
     {
-        // Create socket
-        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sockfd == -1)
+        int r = send(sockfd, "111000", 7, 0);
+        if (r <= 0)
+        {
+            perror("Send failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // UDP Recv
+        int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (udpsockfd == -1)
         {
             perror("Socket creation failed");
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &rbufsize, sizeof(rbufsize)) == -1) {
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_RCVBUF, &rbufsize, sizeof(rbufsize)) == -1) {
             perror("Error setting socket buffer size");
         }
 
-        // Bind the socket to the server address
-        if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == -1)
+        // Create new address
+        struct sockaddr_in client_udp_addr;
+        memset(&client_udp_addr, 0, sizeof(struct sockaddr_in));
+
+        // Configure server address
+        client_udp_addr.sin_family = AF_INET;
+        client_udp_addr.sin_port = htons(rport);
+        client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+
+        // Bind the socket to the address and port
+        if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == -1)
         {
             perror("Bind failed");
             exit(EXIT_FAILURE);
         }
 
-        printf("Server listening on port %d...\n", lport);
+        printf("Client UDP listening on port %d...\n", rport);
 
+        char buffer[rbufsize];
         ES_FlashTimer clock;
         int packetNum = 0;
         long previousClock = clock.Elapsed();
@@ -118,10 +174,10 @@ int handleRecv(int argc, char *argv[])
         long cumTimeCost = 0, cumBytesReceived = 0, statTime = 0, cumJitter = 0;
         while (1)
         {
-            socklen_t addr_len = sizeof(client_addr);
+            socklen_t addr_len = sizeof(server_addr);
 
-            // Receive data from a client
-            int ret = recvfrom(sockfd, buffer, rbufsize - 1, 0, (struct sockaddr *)&client_addr, &addr_len);
+            // Receive data from the server
+            int ret = recvfrom(udpsockfd, buffer, rbufsize - 1, 0, (struct sockaddr *)&server_addr, &addr_len);
             if (ret == -1)
             {
                 perror("Receive failed");
@@ -156,123 +212,78 @@ int handleRecv(int argc, char *argv[])
         }
 
         // Close the server socket
-        close(sockfd);
+        close(udpsockfd);
     }
-    else if (strcmp(proto, "TCP") == 0)
+    else
     {
-        // Create socket
-        sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd == -1)
+        int r = send(sockfd, "011000", 7, 0);
+        if (r <= 0)
         {
-            perror("Socket creation failed");
+            perror("Send failed");
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &rbufsize, sizeof(rbufsize)) == -1) {
-            perror("Error setting socket buffer size");
-        }
-
-        // Bind the socket to the server address
-        if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == -1)
+        char buffer[rbufsize];
+        ES_FlashTimer clock;
+        short exitFlag = 0;
+        int packetNum = 0;
+        long previousClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesReceived = 0, statTime = 0, cumJitter = 0;
+        while (exitFlag == 0)
         {
-            perror("Bind failed");
-            exit(EXIT_FAILURE);
-        }
-
-        // Listen for incoming connections
-        if (listen(sockfd, 1) == -1)
-        {
-            perror("Listen failed");
-            exit(EXIT_FAILURE);
-        }
-
-        printf("Server listening on port %d...\n", lport);
-
-        while (1)
-        {
-            // Accept a connection from a client
-            client_len = sizeof(client_addr);
-            newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
-            if (newsockfd == -1)
-            {
-                perror("Accept failed");
-                exit(EXIT_FAILURE);
-            }
-
-            printf("Client connected: %s\n", inet_ntoa(client_addr.sin_addr));
-
-            // Receive data from the client
-            ES_FlashTimer clock;
-            short exitFlag = 0;
-            int packetNum = 0;
-            long previousClock = clock.Elapsed();
-            long initialClock = clock.Elapsed();
-            long cumTimeCost = 0, cumBytesReceived = 0, statTime = 0, cumJitter = 0;
-            while (exitFlag == 0)
-            {
-                long bytesReceived = 0;
-                while (bytesReceived < pktsize) {
-                    int ret = recv(newsockfd, buffer, pktsize - bytesReceived, 0);
-                    if (ret == -1)
+            long bytesReceived = 0;
+            while (bytesReceived < pktsize) {
+                int ret = recv(sockfd, buffer, pktsize - bytesReceived, 0);
+                if (ret == -1)
+                {
+                    perror("Receive failed");
+                    sleep(3);
+                    break;
+                }
+                else
+                {
+                    if (ret == 0)
                     {
-                        perror("Receive failed");
-                        sleep(3);
+                        printf("Client Disconnected\n");
+                        exitFlag = 1;
                         break;
                     }
                     else
                     {
-                        if (ret == 0)
-                        {
-                            printf("Client Disconnected\n");
-                            exitFlag = 1;
-                            break;
-                        }
-                        else
-                        {
-                            bytesReceived += ret;
-                        }
+                        bytesReceived += ret;
                     }
                 }
-                if (exitFlag == 1) break;
-                cumBytesReceived += bytesReceived;
-
-                // Handle time
-                long currentClock = clock.Elapsed();
-                double timeCost = currentClock - previousClock;
-                previousClock = currentClock;
-                cumTimeCost += timeCost;
-
-                // Calculate
-                packetNum++;
-                double averageTime = 0;
-                if (cumTimeCost > 0)
-                    averageTime = cumTimeCost / packetNum;
-                cumJitter += timeCost - averageTime;
-
-                // Stats
-                statTime += timeCost;
-
-                if (statTime >= stat)
-                {
-                    long currentPacket = getSequence(buffer);
-                    double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
-                    double jitter = (double)cumJitter / packetNum;
-                    printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %ld, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
-                    statTime = 0;
-                }
             }
+            if (exitFlag == 1) break;
+            cumBytesReceived += bytesReceived;
 
-            // Close the client socket
-            close(newsockfd);
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+
+            // Calculate
+            packetNum++;
+            double averageTime = 0;
+            if (cumTimeCost > 0)
+                averageTime = cumTimeCost / packetNum;
+            cumJitter += timeCost - averageTime;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                long currentPacket = getSequence(buffer);
+                double throughput = (double)(cumBytesReceived * 8) / (cumTimeCost * 1000);
+                double jitter = (double)cumJitter / packetNum;
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %d, [Lost] %ld, %.2f%%, [Rate] %.2f Mbps, [Jitter] %.6f ms\n", currentClock - initialClock, packetNum, currentPacket - packetNum, (double)100 * (currentPacket - packetNum) / currentPacket, throughput, jitter);
+                statTime = 0;
+            }
         }
-
-        // Close the server socket
-        close(sockfd);
     }
-    else
-    {
-        exit(EXIT_FAILURE);
-    }
-
+    close(sockfd);
     return 0;
 }

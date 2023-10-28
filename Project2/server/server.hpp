@@ -37,10 +37,7 @@ long getSequence(char *message)
             break;
         }
     }
-    long seq = strtol(sequence, &p, 10);
-
-    if (seq == 0) cout << message << endl;
-    return seq;
+    return strtol(sequence, &p, 10);
 }
 
 void *handleConnection(void *parameter)
@@ -54,7 +51,7 @@ void *handleConnection(void *parameter)
     struct sockaddr_in udp_addr;
     socklen_t addr_len = sizeof(udp_addr);
 
-    cout << "Thread Received: " << params << " " << sockfd << " " << pktrate << endl;
+    // cout << "Thread Received: " << params << " " << sockfd << " " << pktrate << endl;
 
     if (params >= 10)
     {
@@ -103,7 +100,7 @@ void *handleConnection(void *parameter)
 
             int maxfd = max(udpsockfd, sockfd) + 1;
             int select_ret = select(maxfd, &fds, nullptr, nullptr, &timeout);
-            
+
             // cout << "select_ret = " << select_ret << ", udpsockfd: " << FD_ISSET(udpsockfd, &fds) << ", tcpsockfd: " << FD_ISSET(sockfd, &fds) << endl;
             if (select_ret == -1)
             {
@@ -121,7 +118,7 @@ void *handleConnection(void *parameter)
                     exitFlag = 1;
                     break;
                 }
-                cout << udpsockfd << ": " << getSequence(buffer) << endl;
+                // cout << udpsockfd << ": " << getSequence(buffer) << endl;
                 if (exitFlag == 1)
                     break;
             }
@@ -129,7 +126,6 @@ void *handleConnection(void *parameter)
             if (FD_ISSET(sockfd, &fds))
             {
                 // TCP socket check
-                cout << "TCP socket check." << endl;
                 int ret = recv(sockfd, buffer, data->bufsize, 0);
                 if (ret == -1)
                 {
@@ -143,8 +139,9 @@ void *handleConnection(void *parameter)
                     exitFlag = 1;
                     break;
                 }
-                cout << "TCP check passed " << buffer << endl;
-            } else {
+            }
+            else
+            {
                 // TCP socket error check
                 int option = 0;
                 socklen_t option_len = sizeof(option);
@@ -169,7 +166,8 @@ void *handleConnection(void *parameter)
     }
     else
     {
-        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize)) == -1) {
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
+        {
             perror("Error setting socket buffer size");
         }
 
@@ -192,7 +190,7 @@ void *handleConnection(void *parameter)
                     break;
                 }
                 bytesReceived += ret;
-                cout << sockfd << ": " << getSequence(buffer) << endl;
+                // cout << sockfd << ": " << getSequence(buffer) << endl;
             }
             if (exitFlag == 1)
                 break;
@@ -332,6 +330,16 @@ int handleServer(int argc, char *argv[])
         data.pktrate = pktrate;
         data.bufsize = (data.params % 10) ? rbufsize : sbufsize;
 
+        // Display message
+        const char *client_ip = inet_ntoa(client_addr.sin_addr);
+        const char *mode = (data.params % 10 == 0) ? "SEND" : "RECV";
+        const char *protocol = (data.params / 10 == 0) ? "TCP" : "UDP";
+
+        char console_log[512];
+        sprintf(console_log, "Connected to %s port %u [%d] %s, %s, %d Bps", client_ip, ntohs(client_addr.sin_port), newsockfd, mode, protocol, pktrate);
+        cout << console_log << endl;
+
+        // Create Thread to handle this connection
         pthread_t client_thread;
         int create_thread = pthread_create(&client_thread, nullptr, handleConnection, &data);
         if (create_thread != 0)
