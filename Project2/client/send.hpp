@@ -15,7 +15,7 @@ char *generateMessage(int length, int sequence)
 {
     if (length <= 0)
     {
-        cout << "Error: generate message length < 0" << endl;
+        cout << "Error: generate message length <= 0" << endl;
     }
     char *message = (char *)malloc(length * sizeof(char));
     if (sequence == -1)
@@ -158,64 +158,165 @@ int handleSend(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int r = send(sockfd, "101000", 7, 0);
-    if (r <= 0)
+    if (strcmp(proto, "UDP") == 0)
     {
-        perror("Send failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // While need to send
-    long msgsent = 0;
-    ES_FlashTimer clock;
-    int packetNum = 0;
-    long previousClock = clock.Elapsed();
-    long rateLimitClock = clock.Elapsed();
-    long initialClock = clock.Elapsed();
-    long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
-    while (pktnum == 0 || msgsent < pktnum)
-    {
-        // Send data to the server
-        int bytes_sent = 0;
-        char *message = generateMessage(pktsize, msgsent + 1);
-        while (bytes_sent < pktsize)
+        // Get prot number
+        char buffer[8];
+        int r = send(sockfd, "101000", 7, 0);
+        if (r <= 0)
         {
-            if ((bytesSentSecond < pktrate) || (pktrate == 0))
+            perror("Send failed");
+            exit(EXIT_FAILURE);
+        }
+
+        int s = recv(sockfd, buffer, sizeof(buffer), 0);
+        if (s > 0)
+        {
+            cout << "Received port number: " << buffer << endl;
+        }
+        else if (s == 0)
+        {
+            cout << "Server disconnected." << endl;
+        }
+        else
+        {
+            perror("Receive failed");
+        }
+
+        // Create new address
+        struct sockaddr_in server_udp_addr;
+        memset(&server_udp_addr, 0, sizeof(struct sockaddr_in));
+
+        // Configure server address
+        server_udp_addr.sin_family = AF_INET;
+        server_udp_addr.sin_port = htons(strtol(buffer, &p, 10));
+        server_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+
+        // Create UDP socket
+        int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (udpsockfd == -1)
+        {
+            perror("Socket creation failed");
+            exit(EXIT_FAILURE);
+        }
+
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1) {
+            perror("Error setting socket buffer size");
+        }
+
+        // Send data
+        long msgsent = 0;
+        ES_FlashTimer clock;
+        int packetNum = 0;
+        long previousClock = clock.Elapsed();
+        long rateLimitClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
+        while (pktnum == 0 || msgsent < pktnum)
+        {
+            int bytes_sent = 0;
+            char *message = generateMessage(pktsize, msgsent + 1);
+            while (bytes_sent < pktsize)
             {
-                int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
-                if (r > 0)
-                    bytes_sent += r;
-                else
+                if ((bytesSentSecond <= pktrate) || (pktrate == 0))
                 {
-                    perror("Send failed");
-                    exit(EXIT_FAILURE);
+                    int r = sendto(udpsockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_udp_addr, sizeof(server_udp_addr));
+                    if (r > 0)
+                    {
+                        bytes_sent += r;
+                    }
+                    else
+                    {
+                        perror("Send failed");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                if (clock.Elapsed() - 1000 > rateLimitClock) {
+                    bytesSentSecond = 0;
+                    rateLimitClock = clock.Elapsed();
                 }
             }
-            if (clock.Elapsed() - 1000 > rateLimitClock)
+            bytesSentSecond += bytes_sent;
+            cumBytesSent += bytes_sent;
+            msgsent++;
+            free(message);
+
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
             {
-                bytesSentSecond = 0;
-                rateLimitClock = clock.Elapsed();
+                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                statTime = 0;
             }
         }
-        bytesSentSecond += bytes_sent;
-        cumBytesSent += bytes_sent;
-        msgsent++;
-        free(message);
-
-        // Handle time
-        long currentClock = clock.Elapsed();
-        double timeCost = currentClock - previousClock;
-        previousClock = currentClock;
-        cumTimeCost += timeCost;
-
-        // Stats
-        statTime += timeCost;
-
-        if (statTime >= stat)
+    } else {
+        // TCP
+        int r = send(sockfd, "001000", 7, 0);
+        if (r <= 0)
         {
-            double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
-            printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
-            statTime = 0;
+            perror("Send failed");
+            exit(EXIT_FAILURE);
+        }
+
+        long msgsent = 0;
+        ES_FlashTimer clock;
+        int packetNum = 0;
+        long previousClock = clock.Elapsed();
+        long rateLimitClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
+        while (pktnum == 0 || msgsent < pktnum)
+        {
+            // Send data to the server
+            int bytes_sent = 0;
+            char *message = generateMessage(pktsize, msgsent + 1);
+            while (bytes_sent < pktsize)
+            {
+                if ((bytesSentSecond < pktrate) || (pktrate == 0))
+                {
+                    int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                    if (r > 0)
+                        bytes_sent += r;
+                    else
+                    {
+                        perror("Send failed");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                if (clock.Elapsed() - 1000 > rateLimitClock)
+                {
+                    bytesSentSecond = 0;
+                    rateLimitClock = clock.Elapsed();
+                }
+            }
+            bytesSentSecond += bytes_sent;
+            cumBytesSent += bytes_sent;
+            msgsent++;
+            free(message);
+
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
+                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                statTime = 0;
+            }
         }
     }
 
