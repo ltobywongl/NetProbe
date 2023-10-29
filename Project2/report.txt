@@ -9,15 +9,19 @@ Loss: 1.89%
 %CPU 47.5
 
 Windows Platform
+Throughput: 126.32 Mbps
+Loss: 2.45%
+%CPU: 26.4
 
-
----------------------------------------------------------------
+Actually not comparable as different computer spec is used
+The Linux Platform Client and Server is on the same machine, while the windows is only in the same LAN. It is hard to compare.
+-------------------------------------------------------------------------------
 Category                    Higher
----------------------------------------------------------------
-Achievable throughput
-loss
-PU utilization
----------------------------------------------------------------
+-------------------------------------------------------------------------------
+Achievable throughput       Windows
+loss                        Windows
+CPU utilization             Linux
+-------------------------------------------------------------------------------
 
 2. Compare the achievable throughput versus the number of client sessions, under both TCP and UDP.
 
