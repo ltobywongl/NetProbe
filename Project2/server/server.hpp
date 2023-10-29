@@ -219,7 +219,7 @@ void *handleConnection(void *parameter)
         {
             // UDP -recv
             char *p;
-            
+
             int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
             if (udpsockfd == -1)
             {
@@ -239,6 +239,10 @@ void *handleConnection(void *parameter)
             client_udp_addr.sin_port = htons(data->lport + 1);
             client_udp_addr.sin_addr = data->client_addr.sin_addr;
 
+            struct timeval timeout;
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 500;
+
             // Send data
             long msgsent = 0;
             ES_FlashTimer clock;
@@ -246,8 +250,26 @@ void *handleConnection(void *parameter)
             int pktsize = 1000;
             long rateLimitClock = clock.Elapsed();
             long bytesSentSecond = 0;
+
             while (exitFlag == 0)
             {
+                fd_set fds;
+                FD_ZERO(&fds);
+                FD_SET(udpsockfd, &fds);
+                FD_SET(sockfd, &fds);
+
+                int maxfd = max(udpsockfd, sockfd) + 1;
+                int select_ret = select(maxfd, &fds, nullptr, nullptr, &timeout);
+
+                if (select_ret == -1)
+                {
+                    perror("Select failed");
+                    exitFlag = 1;
+                    break;
+                }
+
+                // cout << FD_ISSET(udpsockfd, &fds) << ", " << FD_ISSET(sockfd, &fds) << endl;
+
                 int bytes_sent = 0;
                 char *message = generateMessage(pktsize, msgsent + 1);
                 while (bytes_sent < pktsize && exitFlag == 0)
@@ -274,7 +296,46 @@ void *handleConnection(void *parameter)
                 bytesSentSecond += bytes_sent;
                 msgsent++;
                 free(message);
+                
+                if (FD_ISSET(sockfd, &fds))
+                {
+                    // TCP socket check
+                    int ret = recv(sockfd, buffer, data->bufsize, 0);
+                    if (ret == -1)
+                    {
+                        perror("Receive failed");
+                        exitFlag = 1;
+                        break;
+                    }
+                    else if (ret == 0)
+                    {
+                        printf("Client Disconnected\n");
+                        exitFlag = 1;
+                        break;
+                    }
+                }
+                else
+                {
+                    // TCP socket error check
+                    int option = 0;
+                    socklen_t option_len = sizeof(option);
+                    if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &option_len) == -1)
+                    {
+                        perror("Get socket option failed");
+                        exitFlag = 1;
+                        break;
+                    }
+
+                    if (option != 0)
+                    {
+                        cout << "Client disconnected" << endl;
+                        exitFlag = 1;
+                        break;
+                    }
+                }
             }
+            cout << "Closing UDP Socket..." << endl;
+            close(udpsockfd);
         }
     }
     else

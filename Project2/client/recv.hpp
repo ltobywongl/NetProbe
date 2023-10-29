@@ -131,7 +131,9 @@ int handleRecv(int argc, char *argv[])
 
     if (strcmp(proto, "UDP") == 0)
     {
-        int r = send(sockfd, "111000", 7, 0);
+        char *data = (char *)malloc(8 * sizeof(char));
+        sprintf(data, "11%d", pktrate);
+        int r = send(sockfd, data, 7, 0);
         if (r <= 0)
         {
             perror("Send failed");
@@ -219,7 +221,10 @@ int handleRecv(int argc, char *argv[])
     }
     else
     {
-        int r = send(sockfd, "011000", 7, 0);
+        // TCP recv
+        char *data = (char *)malloc(8 * sizeof(char));
+        sprintf(data, "01%d", pktrate);
+        int r = send(sockfd, data, 7, 0);
         if (r <= 0)
         {
             perror("Send failed");
