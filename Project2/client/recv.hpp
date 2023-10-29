@@ -176,10 +176,10 @@ int handleRecv(int argc, char *argv[])
         struct sockaddr_in client_udp_addr;
         memset(&client_udp_addr, 0, sizeof(struct sockaddr_in));
 
-        // Configure server address
+        // Configure client address
         client_udp_addr.sin_family = AF_INET;
         client_udp_addr.sin_port = htons(rport + 1);
-        client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+        client_udp_addr.sin_addr.s_addr = inet_addr(INADDR_ANY);
 
         // Bind the socket to the address and port
         if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
@@ -236,7 +236,7 @@ int handleRecv(int argc, char *argv[])
         }
 
         // Close the server socket
-        close(udpsockfd);
+        closesocket(udpsockfd);
     }
     else
     {
@@ -313,7 +313,7 @@ int handleRecv(int argc, char *argv[])
             }
         }
     }
-    close(sockfd);
+    closesocket(sockfd);
     WSACleanup();
     return 0;
 }
@@ -417,7 +417,7 @@ int handleRecv(int argc, char *argv[])
     // Configure server address
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(rport);
-    server_addr.sin_addr.s_addr = inet_addr(rhost);
+    server_addr.sin_addr.s_addr = inet_addr(INADDR_ANY);
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)

@@ -349,9 +349,9 @@ int handleSend(int argc, char *argv[])
         }
     }
 
-    close(sockfd);
+    closesocket(sockfd);
     WSACleanup();
-    
+
     return 0;
 }
 
