@@ -179,7 +179,7 @@ int handleRecv(int argc, char *argv[])
         // Configure client address
         client_udp_addr.sin_family = AF_INET;
         client_udp_addr.sin_port = htons(rport + 1);
-        client_udp_addr.sin_addr.s_addr = inet_addr(INADDR_ANY);
+        client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
 
         // Bind the socket to the address and port
         if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
@@ -417,7 +417,7 @@ int handleRecv(int argc, char *argv[])
     // Configure server address
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(rport);
-    server_addr.sin_addr.s_addr = inet_addr(INADDR_ANY);
+    server_addr.sin_addr.s_addr = inet_addr(rhost);
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
