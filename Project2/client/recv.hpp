@@ -178,7 +178,7 @@ int handleRecv(int argc, char *argv[])
         // Configure client address
         client_udp_addr.sin_family = AF_INET;
         client_udp_addr.sin_port = htons(rport + 1);
-        client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+        client_udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
         // Bind the socket to the address and port
         if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
@@ -468,10 +468,10 @@ int handleRecv(int argc, char *argv[])
         // Configure server address
         client_udp_addr.sin_family = AF_INET;
         client_udp_addr.sin_port = htons(rport + 1);
-        client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+        client_udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
         // Bind the socket to the address and port
-        if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
+        if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == -1)
         {
             perror("Bind failed");
             exit(EXIT_FAILURE);
