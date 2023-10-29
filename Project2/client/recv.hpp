@@ -146,7 +146,8 @@ int handleRecv(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(udpsockfd, SOL_SOCKET, SO_RCVBUF, &rbufsize, sizeof(rbufsize)) == -1) {
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_RCVBUF, &rbufsize, sizeof(rbufsize)) == -1)
+        {
             perror("Error setting socket buffer size");
         }
 
@@ -156,7 +157,7 @@ int handleRecv(int argc, char *argv[])
 
         // Configure server address
         client_udp_addr.sin_family = AF_INET;
-        client_udp_addr.sin_port = htons(rport+1);
+        client_udp_addr.sin_port = htons(rport + 1);
         client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
 
         // Bind the socket to the address and port
@@ -166,7 +167,7 @@ int handleRecv(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        printf("Client UDP listening on port %d...\n", rport);
+        printf("Client UDP listening on port %d...\n", rport + 1);
 
         char buffer[rbufsize];
         ES_FlashTimer clock;
@@ -235,7 +236,8 @@ int handleRecv(int argc, char *argv[])
         while (exitFlag == 0)
         {
             long bytesReceived = 0;
-            while (bytesReceived < pktsize) {
+            while (bytesReceived < pktsize)
+            {
                 int ret = recv(sockfd, buffer, pktsize - bytesReceived, 0);
                 if (ret == -1)
                 {
@@ -257,7 +259,8 @@ int handleRecv(int argc, char *argv[])
                     }
                 }
             }
-            if (exitFlag == 1) break;
+            if (exitFlag == 1)
+                break;
             cumBytesReceived += bytesReceived;
 
             // Handle time

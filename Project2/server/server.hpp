@@ -19,8 +19,10 @@ using namespace std;
 
 struct ThreadData
 {
+    sockaddr_in client_addr;
     int params;
     int sockfd;
+    int lport;
     int pktrate;
     int bufsize;
 };
@@ -103,6 +105,7 @@ void *handleConnection(void *parameter)
     {
         if (params == 10)
         {
+            // UDP -send
             struct sockaddr_in client_addr;
             memset(&client_addr, 0, sizeof(struct sockaddr_in));
             socklen_t client_len = sizeof(client_addr);
@@ -214,7 +217,64 @@ void *handleConnection(void *parameter)
         }
         else
         {
-            cout << "UDP recv" << endl;
+            // UDP -recv
+            char *p;
+            
+            int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (udpsockfd == -1)
+            {
+                perror("Socket creation failed");
+                exit(EXIT_FAILURE);
+            }
+
+            if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
+            {
+                perror("Error setting socket buffer size");
+            }
+
+            // Client UDP
+            struct sockaddr_in client_udp_addr;
+            memset(&client_udp_addr, 0, sizeof(struct sockaddr_in));
+            client_udp_addr.sin_family = AF_INET;
+            client_udp_addr.sin_port = htons(data->lport + 1);
+            client_udp_addr.sin_addr = data->client_addr.sin_addr;
+
+            // Send data
+            long msgsent = 0;
+            ES_FlashTimer clock;
+            int packetNum = 0;
+            int pktsize = 1000;
+            long rateLimitClock = clock.Elapsed();
+            long bytesSentSecond = 0;
+            while (exitFlag == 0)
+            {
+                int bytes_sent = 0;
+                char *message = generateMessage(pktsize, msgsent + 1);
+                while (bytes_sent < pktsize && exitFlag == 0)
+                {
+                    if ((bytesSentSecond <= pktrate) || (pktrate == 0))
+                    {
+                        int r = sendto(udpsockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&client_udp_addr, sizeof(client_udp_addr));
+                        if (r > 0)
+                        {
+                            bytes_sent += r;
+                        }
+                        else
+                        {
+                            perror("Send failed");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    if (clock.Elapsed() - 1000 > rateLimitClock)
+                    {
+                        bytesSentSecond = 0;
+                        rateLimitClock = clock.Elapsed();
+                    }
+                }
+                bytesSentSecond += bytes_sent;
+                msgsent++;
+                free(message);
+            }
         }
     }
     else
@@ -425,6 +485,8 @@ int handleServer(int argc, char *argv[])
         data.sockfd = newsockfd;
         data.pktrate = pktrate;
         data.bufsize = (data.params % 10) ? rbufsize : sbufsize;
+        data.lport = lport;
+        data.client_addr = client_addr;
 
         // Display message
         const char *client_ip = inet_ntoa(client_addr.sin_addr);
