@@ -222,7 +222,7 @@ void *handleConnection(void *parameter)
         // TCP -send
         if (params == 0)
         {
-            if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
+            if (setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
             {
                 perror("Error setting socket buffer size");
             }
@@ -251,17 +251,16 @@ void *handleConnection(void *parameter)
                 if (exitFlag == 1)
                     break;
             }
-            cout << "Closing TCP Socket..." << endl;
-            close(sockfd);
-
-            cout << "Closing Thread..." << endl;
-            pthread_exit(nullptr);
         }
-        else
+        else // TCP -recv
         {
-            // TCP -recv
+            if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
+            {
+                perror("Error setting socket buffer size");
+            }
+
+            long msgsent = 0;
             ES_FlashTimer clock;
-            short exitFlag = 0;
             int pktsize = 1000;
             long rateLimitClock = clock.Elapsed();
             long bytesSentSecond = 0;
@@ -270,16 +269,17 @@ void *handleConnection(void *parameter)
             {
                 // Send data to the server
                 int bytes_sent = 0;
-                while (bytes_sent < pktsize)
+                char *message = generateMessage(pktsize, msgsent + 1);
+                while (bytes_sent < pktsize && exitFlag == 0)
                 {
                     if ((bytesSentSecond < pktrate) || (pktrate == 0))
                     {
-                        int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                        int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, MSG_NOSIGNAL);
                         if (r > 0)
                             bytes_sent += r;
                         else
                         {
-                            perror("Send failed");
+                            cout << "Client Disconnected" << endl;
                             exitFlag = 1;
                             break;
                         }
@@ -291,15 +291,16 @@ void *handleConnection(void *parameter)
                     }
                 }
                 bytesSentSecond += bytes_sent;
+                msgsent++;
+                free(message);
             }
-            free(message);
-            cout << "Closing TCP Socket..." << endl;
-            close(sockfd);
-
-            cout << "Closing Thread..." << endl;
-            pthread_exit(nullptr);
         }
     }
+    cout << "Closing TCP Socket..." << endl;
+    close(sockfd);
+
+    cout << "Closing Thread..." << endl;
+    pthread_exit(nullptr);
     return nullptr;
 }
 
@@ -398,15 +399,11 @@ int handleServer(int argc, char *argv[])
 
         // Receive data from the client
         int bytesRead = recv(newsockfd, buffer, 16, 0);
-        if (bytesRead > 0)
-        {
-            cout << "Received data from client: " << buffer << endl;
-        }
-        else if (bytesRead == 0)
+        if (bytesRead == 0)
         {
             cout << "Client disconnected." << endl;
         }
-        else
+        else if (bytesRead < 0)
         {
             perror("Receive failed");
         }

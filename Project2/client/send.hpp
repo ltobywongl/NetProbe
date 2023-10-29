@@ -291,6 +291,7 @@ int handleSend(int argc, char *argv[])
                         bytes_sent += r;
                     else
                     {
+                        free(message);
                         perror("Send failed");
                         exit(EXIT_FAILURE);
                     }
