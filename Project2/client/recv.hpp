@@ -119,7 +119,6 @@ int handleRecv(int argc, char *argv[])
         return -1;
     }
 
-    int sockfd;
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
 
@@ -167,7 +166,7 @@ int handleRecv(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(udpsockfd, SOL_SOCKET, SO_RCVBUF, (const char*)&rbufsize, sizeof(rbufsize)) == SOCKET_ERROR)
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_RCVBUF, (const char*)&rbufsize, sizeof(rbufsize)) == -1)
         {
             perror("Error setting socket buffer size");
         }
@@ -472,7 +471,7 @@ int handleRecv(int argc, char *argv[])
         client_udp_addr.sin_addr.s_addr = inet_addr(rhost);
 
         // Bind the socket to the address and port
-        if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == -1)
+        if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
         {
             perror("Bind failed");
             exit(EXIT_FAILURE);

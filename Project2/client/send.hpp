@@ -222,7 +222,7 @@ int handleSend(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
+        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, (const char*)&sbufsize, sizeof(sbufsize)) == -1)
         {
             perror("Error setting socket buffer size");
         }
