@@ -385,7 +385,6 @@ void *handleConnection(void *parameter)
             int pktsize = 1000;
             long rateLimitClock = clock.Elapsed();
             long bytesSentSecond = 0;
-            char *message = generateMessage(pktsize, -1);
             while (exitFlag == 0)
             {
                 // Send data to the server
