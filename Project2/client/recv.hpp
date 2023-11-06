@@ -163,6 +163,7 @@ int handleRecv(int argc, char *argv[])
         if (udpsockfd == -1)
         {
             perror("Socket creation failed");
+            WSACleanup();
             exit(EXIT_FAILURE);
         }
 
@@ -178,12 +179,14 @@ int handleRecv(int argc, char *argv[])
         // Configure client address
         client_udp_addr.sin_family = AF_INET;
         client_udp_addr.sin_port = htons(rport + 1);
-        client_udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        client_udp_addr.sin_addr.s_addr = inet_addr("192.168.0.160");
 
         // Bind the socket to the address and port
         if (bind(udpsockfd, (struct sockaddr *)&client_udp_addr, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
         {
-            perror("Bind failed");
+            printf("Bind failed: %d\n", WSAGetLastError());
+            closesocket(udpsockfd);
+            WSACleanup();
             exit(EXIT_FAILURE);
         }
 
