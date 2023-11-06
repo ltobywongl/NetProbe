@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "es_timer.hpp"
+#include "helper.hpp"
+#include "udpsocket.hpp"
 
 #define MAX_CONN 10
 #define TIMEOUT_SECONDS 10
@@ -27,67 +29,6 @@ struct ThreadData
     int bufsize;
 };
 
-char *generateMessage(int length, int sequence)
-{
-    if (length <= 0)
-    {
-        cout << "Error: generate message length <= 0" << endl;
-    }
-    char *message = (char *)malloc(length * sizeof(char));
-    if (sequence == -1)
-    {
-        int index = 0;
-        for (int i = 0; i < length; i++)
-        {
-            message[i] = '0' + index;
-            index = index + 1;
-            if (index == 10)
-            {
-                index = 0;
-            }
-        }
-        message[length - 1] = '\0';
-        return message;
-    }
-    else
-    {
-        sprintf(message, "%d", sequence);
-        int flag = 0;
-        for (int i = 0; i < length; i++)
-        {
-            if (message[i] == '\0')
-            {
-                flag = 1;
-                message[i] = '#';
-                continue;
-            }
-            if (flag == 1)
-            {
-                message[i] = '0';
-            }
-        }
-        message[length - 1] = '\0';
-        return message;
-    }
-}
-
-long getSequence(char *message)
-{
-    char *p;
-    char sequence[16];
-    strncpy(sequence, message, 15);
-    sequence[15] = '\0';
-    for (int i = 0; i < 15; i++)
-    {
-        if (sequence[i] == '#')
-        {
-            sequence[i] = '\0';
-            break;
-        }
-    }
-    return strtol(sequence, &p, 10);
-}
-
 void *handleConnection(void *parameter)
 {
     ThreadData *data = reinterpret_cast<ThreadData *>(parameter);
@@ -99,45 +40,34 @@ void *handleConnection(void *parameter)
     struct sockaddr_in udp_addr;
     socklen_t addr_len = sizeof(udp_addr);
 
-    // cout << "Thread Received: " << params << " " << sockfd << " " << pktrate << endl;
-
     if (params >= 10)
     {
         if (params == 10)
         {
             // UDP -send
-            struct sockaddr_in client_addr;
-            memset(&client_addr, 0, sizeof(struct sockaddr_in));
-            socklen_t client_len = sizeof(client_addr);
-
-            int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
-            if (udpsockfd == -1)
-            {
-                perror("UDP Socket creation failed");
+            UDPSocket udpSocket;
+            if (!udpSocket.createSocket()) {
+                pthread_exit(nullptr);
+            }
+            if (!udpSocket.bindToPort(0)) {
+                close(udpSocket.sockfd);
                 close(sockfd);
                 pthread_exit(nullptr);
             }
 
-            udp_addr.sin_family = AF_INET;
-            udp_addr.sin_addr.s_addr = INADDR_ANY;
-            udp_addr.sin_port = 0; // Let system choose the port
-            if (bind(udpsockfd, (struct sockaddr *)&udp_addr, sizeof(udp_addr)) < 0)
-            {
-                perror("UDP bind failed");
-                close(udpsockfd);
-                close(sockfd);
-                pthread_exit(nullptr);
-            }
-
-            // Get the chosen port number
-            getsockname(udpsockfd, (struct sockaddr *)&udp_addr, &addr_len);
+            struct sockaddr_in udpAddress;
+            socklen_t udpAddressLength = sizeof(udpAddress);
+            udpSocket.getAddress((struct sockaddr *)&udpAddress, &udpAddressLength);
 
             // Sending back the port num to client
-            char msg[8];
-            sprintf(msg, "%d", ntohs(udp_addr.sin_port));
-            send(sockfd, msg, strlen(msg), 0);
+            string msg = to_string(ntohs(udpAddress.sin_port));
+            send(sockfd, msg.c_str(), msg.length(), 0);
             cout << "Sent UDP port number to client: " << msg << endl;
 
+            struct sockaddr_in clientAddress;
+            memset(&clientAddress, 0, sizeof(struct sockaddr_in));
+            socklen_t clientLength = sizeof(clientAddress);
+    
             while (exitFlag == 0)
             {
                 struct timeval timeout;
@@ -146,13 +76,12 @@ void *handleConnection(void *parameter)
 
                 fd_set fds;
                 FD_ZERO(&fds);
-                FD_SET(udpsockfd, &fds);
+                FD_SET(udpSocket.sockfd, &fds);
                 FD_SET(sockfd, &fds);
 
-                int maxfd = max(udpsockfd, sockfd) + 1;
+                int maxfd = max(udpSocket.sockfd, sockfd) + 1;
                 int select_ret = select(maxfd, &fds, nullptr, nullptr, &timeout);
 
-                // cout << "select_ret = " << select_ret << ", udpsockfd: " << FD_ISSET(udpsockfd, &fds) << ", tcpsockfd: " << FD_ISSET(sockfd, &fds) << endl;
                 if (select_ret == -1)
                 {
                     perror("Select failed");
@@ -160,33 +89,21 @@ void *handleConnection(void *parameter)
                     break;
                 }
 
-                if (FD_ISSET(udpsockfd, &fds))
+                if (FD_ISSET(udpSocket.sockfd, &fds))
                 {
-                    int ret = recvfrom(udpsockfd, buffer, data->bufsize - 1, 0, (struct sockaddr *)&client_addr, &client_len);
-                    if (ret == -1)
-                    {
-                        perror("Receive failed");
+                    if (!udpSocket.receive(buffer, data->bufsize, &clientAddress, &clientLength)) {
                         exitFlag = 1;
                         break;
                     }
-                    // cout << udpsockfd << ": " << getSequence(buffer) << endl;
-                    if (exitFlag == 1)
-                        break;
                 }
 
                 if (FD_ISSET(sockfd, &fds))
                 {
                     // TCP socket check
                     int ret = recv(sockfd, buffer, data->bufsize, 0);
-                    if (ret == -1)
+                    if (ret <= 0)
                     {
-                        perror("Receive failed");
-                        exitFlag = 1;
-                        break;
-                    }
-                    else if (ret == 0)
-                    {
-                        printf("Client Disconnected\n");
+                        printf("Client Disconnected or Error\n");
                         exitFlag = 1;
                         break;
                     }
@@ -213,7 +130,7 @@ void *handleConnection(void *parameter)
             }
 
             cout << "Closing UDP Socket..." << endl;
-            close(udpsockfd);
+            close(udpSocket.sockfd);
         }
         else
         {
@@ -272,7 +189,7 @@ void *handleConnection(void *parameter)
 
                 int bytes_sent = 0;
                 char *message = generateMessage(pktsize, msgsent + 1);
-                while (bytes_sent < pktsize && exitFlag == 0)
+                while (bytes_sent < pktsize)
                 {
                     if ((bytesSentSecond <= pktrate) || (pktrate == 0))
                     {
