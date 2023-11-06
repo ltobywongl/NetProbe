@@ -12,16 +12,6 @@
 
 using namespace std;
 
-struct ThreadData
-{
-    sockaddr_in client_addr;
-    int params;
-    int sockfd;
-    int lport;
-    int pktrate;
-    int bufsize;
-};
-
 int handleServer(int argc, char *argv[])
 {
     // ** Handle Parameters **
