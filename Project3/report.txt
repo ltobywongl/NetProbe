@@ -1,0 +1,38 @@
+Project Experiments
+
+1. Compare the achievable throughput, loss, and CPU utilization in Linux and Windows platforms.
+
+With pktrate set to 0 and protocol set to UDP, the measurings are as follow. (Server send to client)
+Linux Platform:
+Throughput: 154.12 Mbps
+Loss: 1.89%
+%CPU 47.5
+
+Windows Platform
+
+
+---------------------------------------------------------------
+Category                    Higher
+---------------------------------------------------------------
+Achievable throughput
+loss
+PU utilization
+---------------------------------------------------------------
+
+2. Compare the achievable throughput versus the number of client sessions, under both TCP and UDP.
+
+With pktrate set to 0 and protocol set to UDP, the measurings are as follow. (Client send to server)
+Linux Platform:
+1 session running:  231.02 Mbps
+2 sessions running: Average 165.25 Mbps per session
+3 sessions running: Average 118.84 Mbps per session
+
+The achievable throughput drops for each client. But the total throughput of all the clients sum up is increasing with session number.
+
+3. Explore the performance impact of delay and loss using Linux tc to emulate different delay and loss scenarios.
+
+Add delay of 1000ms: tc qdisc add dev lo root netem delay 1000ms
+With pktrate set to 0 and protocol set to UDP, the measurings are as follow. (Server send to client)
+
+The throughput dropped to 7.23 Mbps. In Q1, it was 154.12 Mbps, that is a significant drop.
+The loss is now 95.67%.
