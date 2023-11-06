@@ -44,8 +44,24 @@ public:
         return true;
     }
 
+    bool setOption(int level, int optname, const void* optval, socklen_t optlen) {
+        if (setsockopt(sockfd, level, optname, optval, optlen) == -1)
+        {
+            perror("Error setting socket buffer size");
+            return false;
+        }
+        return true;
+    }
+
     int getAddress(sockaddr * destAddress, socklen_t * destLength) {
         return getsockname(sockfd, destAddress, destLength);
+    }
+
+    int getPort() {
+        struct sockaddr_in udpAddress;
+        socklen_t udpAddressLength = sizeof(udpAddress);
+        getAddress((struct sockaddr *)&udpAddress, &udpAddressLength);
+        return (int)ntohs(udpAddress.sin_port);
     }
 
     ssize_t send(char* message, size_t messageLength, sockaddr_in* clientAddress) {

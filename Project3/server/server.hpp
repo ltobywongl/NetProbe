@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "es_timer.hpp"
-#include "helper.hpp"
 #include "udpsocket.hpp"
 
 #define MAX_CONN 10
@@ -54,13 +53,9 @@ void *handleConnection(void *parameter)
                 close(sockfd);
                 pthread_exit(nullptr);
             }
+            udpSocket.setOption(SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize));
 
-            struct sockaddr_in udpAddress;
-            socklen_t udpAddressLength = sizeof(udpAddress);
-            udpSocket.getAddress((struct sockaddr *)&udpAddress, &udpAddressLength);
-
-            // Sending back the port num to client
-            string msg = to_string(ntohs(udpAddress.sin_port));
+            string msg = to_string(udpSocket.getPort());
             send(sockfd, msg.c_str(), msg.length(), 0);
             cout << "Sent UDP port number to client: " << msg << endl;
 
@@ -113,16 +108,9 @@ void *handleConnection(void *parameter)
                     // TCP socket error check
                     int option = 0;
                     socklen_t option_len = sizeof(option);
-                    if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &option_len) == -1)
+                    if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &option_len) == -1 || option != 0)
                     {
-                        perror("Get socket option failed");
-                        exitFlag = 1;
-                        break;
-                    }
-
-                    if (option != 0)
-                    {
-                        cout << "Client disconnected" << endl;
+                        perror("Client disconnected or Error");
                         exitFlag = 1;
                         break;
                     }
