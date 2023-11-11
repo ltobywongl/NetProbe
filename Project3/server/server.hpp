@@ -4,13 +4,87 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <vector>
+#include <mutex>
+#include <condition_variable>
 #include "es_timer.hpp"
 #include "thread.hpp"
+#include "pipe.h"
 
 #define MAX_CONN 10
 #define TIMEOUT_SECONDS 10
+#define THREADS 8
 
 using namespace std;
+
+class ThreadPool
+{
+public:
+    ThreadPool(size_t numThreads) : stop(false)
+    {
+        pipe_t *p = pipe_new(sizeof(int), 0);
+
+        pipe_producer_t *pros[THREADS] = {pipe_producer_new(p)};
+        pipe_consumer_t *cons[THREADS] = {pipe_consumer_new(p)};
+
+        pipe_free(p);
+    }
+
+    ~ThreadPool()
+    {
+        for (int i = 0; i < THREADS; i++)
+        {
+            pipe_producer_free(pros[i]);
+            pipe_consumer_free(cons[i]);
+        }
+    }
+
+private:
+    pipe_t *p = pipe_new(sizeof(int), 0);
+
+    pipe_producer_t *pros[THREADS];
+    pipe_consumer_t *cons[THREADS];
+
+    mutex queueMutex;
+    bool stop;
+};
+
+int initTCP(int lport)
+{
+    int sockfd;
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(struct sockaddr_in));
+    pthread_t thread_id;
+
+    // Create socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(lport);
+
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    cout << "Binding local socket to port number " << lport << " with late binding ... successful." << endl;
+
+    if (listen(sockfd, MAX_CONN) < 0)
+    {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
+
+    cout << "Listening to incoming connection request ... " << endl;
+    return sockfd;
+}
 
 int handleServer(int argc, char *argv[])
 {
@@ -57,45 +131,15 @@ int handleServer(int argc, char *argv[])
     }
 
     // ** Handle Socket **
-    int sockfd, newsockfd;
-    struct sockaddr_in server_addr, client_addr;
-    memset(&server_addr, 0, sizeof(struct sockaddr_in));
-    memset(&client_addr, 0, sizeof(struct sockaddr_in));
-    pthread_t thread_id;
-
-    // Create socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
-    {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(lport);
-
-    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
-    {
-        perror("Bind failed");
-        exit(EXIT_FAILURE);
-    }
-
-    cout << "Binding local socket to port number " << lport << " with late binding ... successful." << endl;
-
-    if (listen(sockfd, MAX_CONN) < 0)
-    {
-        perror("Listen failed");
-        exit(EXIT_FAILURE);
-    }
-
-    cout << "Listening to incoming connection request ... " << endl;
+    int sockfd = initTCP(lport);
 
     // Accept TCP connection to receive settings
+    struct sockaddr_in client_addr;
+    memset(&client_addr, 0, sizeof(struct sockaddr_in));
     while (true)
     {
         socklen_t client_addr_len = sizeof(client_addr);
-        newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
         if (newsockfd < 0)
         {
             perror("Accept failed");

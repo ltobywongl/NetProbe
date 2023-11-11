@@ -45,10 +45,12 @@ void *handleConnection(void *parameter)
         {
             // UDP -send
             UDPSocket udpSocket;
-            if (!udpSocket.createSocket()) {
+            if (!udpSocket.createSocket())
+            {
                 pthread_exit(nullptr);
             }
-            if (!udpSocket.bindToPort(0)) {
+            if (!udpSocket.bindToPort(0))
+            {
                 close(udpSocket.sockfd);
                 close(sockfd);
                 pthread_exit(nullptr);
@@ -62,7 +64,7 @@ void *handleConnection(void *parameter)
             struct sockaddr_in clientAddress;
             memset(&clientAddress, 0, sizeof(struct sockaddr_in));
             socklen_t clientLength = sizeof(clientAddress);
-    
+
             while (exitFlag == 0)
             {
                 struct timeval timeout;
@@ -86,7 +88,8 @@ void *handleConnection(void *parameter)
 
                 if (FD_ISSET(udpSocket.sockfd, &fds))
                 {
-                    if (!udpSocket.receive(buffer, data->bufsize, &clientAddress, &clientLength)) {
+                    if (!udpSocket.receive(buffer, data->bufsize, &clientAddress, &clientLength))
+                    {
                         exitFlag = 1;
                         break;
                     }
@@ -201,7 +204,7 @@ void *handleConnection(void *parameter)
                 bytesSentSecond += bytes_sent;
                 msgsent++;
                 free(message);
-                
+
                 if (FD_ISSET(sockfd, &fds))
                 {
                     // TCP socket check
