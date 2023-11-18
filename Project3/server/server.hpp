@@ -19,6 +19,88 @@
 
 using namespace std;
 
+class ThreadPool
+{
+    public:
+        ThreadPool(int threads) : stop(false)
+        {
+            numThreads = threads;
+            cout << "Creating thread pool..." << endl;
+            pthread_mutex_init(&queueMutex, nullptr);
+            pthread_cond_init(&condition, nullptr);
+
+            cout << "Creating threads ..." << endl;
+            for (int i = 0; i < numThreads; i++) {
+                pthread_t thread;
+                cout << "Creating thread #" << i << endl;
+                pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
+                cout << "Pushing thread #" << i << endl;
+                workers.push_back(thread);
+            }
+        }
+
+        ~ThreadPool()
+        {
+            pthread_mutex_lock(&queueMutex);
+            stop = true;
+            pthread_mutex_unlock(&queueMutex);
+            pthread_cond_broadcast(&condition);
+
+            for (pthread_t& thread : workers) {
+                pthread_join(thread, nullptr);
+            }
+
+            pthread_mutex_destroy(&queueMutex);
+            pthread_cond_destroy(&condition);
+        }
+
+        void enqueue(ThreadData data)
+        {
+            pthread_mutex_lock(&queueMutex);
+            tasks.push(data);
+            pthread_mutex_unlock(&queueMutex);
+            pthread_cond_signal(&condition);
+        }
+
+    private:
+        int numThreads;
+        bool stop;
+
+        vector<pthread_t> workers;
+        queue<ThreadData> tasks;
+
+        pthread_mutex_t queueMutex;
+        pthread_cond_t condition;
+
+        static void* threadEntry(void* arg) {
+            ThreadPool* pool = static_cast<ThreadPool*>(arg);
+            pool->thread_handle();
+            return nullptr;
+        }
+
+        void thread_handle() {
+            while (true)
+            {
+                pthread_mutex_lock(&queueMutex);
+
+                while (tasks.empty() && !stop) {
+                    pthread_cond_wait(&condition, &queueMutex);
+                }
+
+                if (stop && tasks.empty()) {
+                    pthread_mutex_unlock(&queueMutex);
+                    break;
+                }
+                ThreadData data = tasks.front();
+                tasks.pop();
+
+                pthread_mutex_unlock(&queueMutex);
+
+                handleConnection(&data);
+            }
+        }
+};
+
 int initTCP(int lport)
 {
     int sockfd;
@@ -99,6 +181,9 @@ int handleServer(int argc, char *argv[])
         }
     }
 
+    // Thread Pool
+    ThreadPool threadPool(8);
+
     // ** Handle Socket **
     int sockfd = initTCP(lport);
 
@@ -141,7 +226,6 @@ int handleServer(int argc, char *argv[])
             continue;
         }
 
-        ThreadPool threadPool(8);
         ThreadData data;
         data.params = strtol(params, &p, 10);
         data.sockfd = newsockfd;
