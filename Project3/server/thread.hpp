@@ -44,6 +44,10 @@ void handleConnection(ThreadData *data)
         {
             // UDP -send
             UDPSocket udpSocket;
+            if (!udpSocket.createSocket())
+            {
+                return;
+            }
             if (!udpSocket.bindToPort(0))
             {
                 close(udpSocket.sockfd);
@@ -232,7 +236,6 @@ void handleConnection(ThreadData *data)
         // TCP -send
         if (params == 0)
         {
-            cout << "TCP -send" << endl;
             if (setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
             {
                 perror("Error setting socket buffer size");

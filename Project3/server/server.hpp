@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <vector>
@@ -25,16 +26,14 @@ class ThreadPool
         ThreadPool(int threads) : stop(false)
         {
             numThreads = threads;
-            cout << "Creating thread pool..." << endl;
             pthread_mutex_init(&queueMutex, nullptr);
             pthread_cond_init(&condition, nullptr);
 
-            cout << "Creating threads ..." << endl;
+            pthread_create()
+
             for (int i = 0; i < numThreads; i++) {
                 pthread_t thread;
-                cout << "Creating thread #" << i << endl;
                 pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
-                cout << "Pushing thread #" << i << endl;
                 workers.push_back(thread);
             }
         }
@@ -56,19 +55,49 @@ class ThreadPool
 
         void enqueue(ThreadData data)
         {
+            
+            pthread_mutex_lock(&runningTasksMutex);
+            if (numTasks == numThreads) {
+                cout << "Doubling pool size" << endl;
+                changePoolSize(numThreads * 2);
+            }
+            pthread_mutex_unlock(&runningTasksMutex);
+
             pthread_mutex_lock(&queueMutex);
             tasks.push(data);
             pthread_mutex_unlock(&queueMutex);
             pthread_cond_signal(&condition);
         }
 
+        void changePoolSize(int newPoolSize)
+        {
+            pthread_mutex_lock(&queueMutex);
+            numThreads = newPoolSize;
+
+            for (int i = workers.size(); i < numThreads; i++)
+            {
+                pthread_t thread;
+                pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
+                workers[i] = thread;
+            }
+
+            for (int i = numThreads; i < workers.size(); i++)
+            {
+                pthread_cancel(workers[i]);
+                pthread_join(workers[i], nullptr);
+            }
+            pthread_mutex_unlock(&queueMutex);
+        }
+
     private:
         int numThreads;
+        int numTasks = 0;
         bool stop;
 
         vector<pthread_t> workers;
         queue<ThreadData> tasks;
 
+        pthread_mutex_t runningTasksMutex;
         pthread_mutex_t queueMutex;
         pthread_cond_t condition;
 
@@ -78,9 +107,31 @@ class ThreadPool
             return nullptr;
         }
 
+        void pool_size_handle() {
+            long timeLog = -1;
+            ES_FlashTimer clock;
+            while (true) {
+                long currentTime = clock.Elapsed();
+                if (timeLog != -1 && timeLog < currentTime - 60000) {
+                    cout << "Halfing pool size" << endl;
+                    changePoolSize(ceil(numThreads / 2));
+                }
+                pthread_mutex_lock(&runningTasksMutex);
+                if (timeLog == -1 && numTasks < numThreads / 2) {
+                    timeLog = clock.Elapsed();
+                }
+                if (numTasks >= numThreads / 2) {
+                    timeLog = -1;
+                }
+                pthread_mutex_unlock(&runningTasksMutex);
+                
+            }
+        }
+
         void thread_handle() {
             while (true)
             {
+                // Change queue
                 pthread_mutex_lock(&queueMutex);
 
                 while (tasks.empty() && !stop) {
@@ -93,10 +144,19 @@ class ThreadPool
                 }
                 ThreadData data = tasks.front();
                 tasks.pop();
-
                 pthread_mutex_unlock(&queueMutex);
 
+                // Change number of running tasks count
+                pthread_mutex_lock(&runningTasksMutex);
+                numTasks++;
+                pthread_mutex_unlock(&runningTasksMutex);
+
                 handleConnection(&data);
+
+                // Change number of running tasks count
+                pthread_mutex_lock(&runningTasksMutex);
+                numTasks--;
+                pthread_mutex_unlock(&runningTasksMutex);
             }
         }
 };
