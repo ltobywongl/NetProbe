@@ -28,7 +28,7 @@ struct ThreadData
     int bufsize;
 };
 
-void *handleConnection(ThreadData *data)
+void handleConnection(ThreadData *data)
 {
     int params = data->params;
     int sockfd = data->sockfd;
@@ -44,15 +44,10 @@ void *handleConnection(ThreadData *data)
         {
             // UDP -send
             UDPSocket udpSocket;
-            if (!udpSocket.createSocket())
-            {
-                pthread_exit(nullptr);
-            }
             if (!udpSocket.bindToPort(0))
             {
                 close(udpSocket.sockfd);
                 close(sockfd);
-                pthread_exit(nullptr);
             }
             udpSocket.setOption(SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize));
 
@@ -313,8 +308,5 @@ void *handleConnection(ThreadData *data)
     }
     cout << "Closing TCP Socket..." << endl;
     close(sockfd);
-
-    cout << "Closing Thread..." << endl;
-    pthread_exit(nullptr);
-    return nullptr;
+    return;
 }
