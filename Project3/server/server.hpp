@@ -228,6 +228,7 @@ int handleServer(int argc, char *argv[])
     int lport = 4180;
     int sbufsize = 65536;
     int rbufsize = 65536;
+    int poolsize = 8;
     char *p;
 
     // Read options
@@ -255,6 +256,11 @@ int handleServer(int argc, char *argv[])
                 rbufsize = strtol(argv[i + 1], &p, 10);
                 i++;
             }
+            else if (strcmp(argv[i], "-poolsize") == 0)
+            {
+                poolsize = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
             else
             {
                 printf("Unknown option: %s\n", argv[i]);
@@ -264,7 +270,7 @@ int handleServer(int argc, char *argv[])
     }
 
     // Thread Pool
-    ThreadPool threadPool(8);
+    ThreadPool threadPool(poolsize);
 
     // ** Handle Socket **
     int sockfd = initTCP(lport);
@@ -301,7 +307,9 @@ int handleServer(int argc, char *argv[])
         strncpy(params, buffer, 2);
         int pktrate = strtol((buffer + 2), &p, 10);
 
-        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 || strcmp(params, "00") == 0 || strcmp(params, "11") == 0))
+        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 ||
+              strcmp(params, "00") == 0 || strcmp(params, "11") == 0) ||
+            strcmp(params, "20") == 0 || strcmp(params, "21") == 0)
         {
             cout << "Wrong parameter format" << endl;
             close(newsockfd);

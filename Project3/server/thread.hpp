@@ -38,7 +38,42 @@ void handleConnection(ThreadData *data)
     struct sockaddr_in udp_addr;
     socklen_t addr_len = sizeof(udp_addr);
 
-    if (params >= 10)
+    if (params >= 20)
+    {
+        if (params == 20)
+        {
+            // No Persist
+            
+        }
+        else
+        {
+            //Persist
+            if (setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize)) == -1)
+            {
+                perror("Error setting socket buffer size");
+            }
+
+            char buffer[1];
+            while (exitFlag == 0)
+            {
+                int ret = recv(sockfd, buffer, 1, 0);
+                if (ret <= 0)
+                {
+                    printf("Client Disconnected or Error\n");
+                    exitFlag = 1;
+                    break;
+                }
+                int r = send(sockfd, buffer, 1, 0);
+                if (r <= 0)
+                {
+                    cout << "Client Disconnected or Error" << endl;
+                    exitFlag = 1;
+                    break;
+                }
+            }
+        }
+    }
+    else if (params >= 10)
     {
         if (params == 10)
         {
@@ -260,7 +295,6 @@ void handleConnection(ThreadData *data)
                         break;
                     }
                     bytesReceived += ret;
-                    // cout << sockfd << ": " << getSequence(buffer) << endl;
                 }
                 if (exitFlag == 1)
                     break;
