@@ -3,13 +3,15 @@
 #include <cstring>
 #include <unistd.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <vector>
 #include <mutex>
+#include <pthread.h>
 #include <condition_variable>
+#include <mutex>
+#include <queue>
+#include <functional>
 #include "es_timer.hpp"
 #include "thread.hpp"
-#include "pipe.h"
 
 #define MAX_CONN 10
 #define TIMEOUT_SECONDS 10
@@ -17,44 +19,11 @@
 
 using namespace std;
 
-class ThreadPool
-{
-public:
-    ThreadPool(size_t numThreads) : stop(false)
-    {
-        pipe_t *p = pipe_new(sizeof(int), 0);
-
-        pipe_producer_t *pros[THREADS] = {pipe_producer_new(p)};
-        pipe_consumer_t *cons[THREADS] = {pipe_consumer_new(p)};
-
-        pipe_free(p);
-    }
-
-    ~ThreadPool()
-    {
-        for (int i = 0; i < THREADS; i++)
-        {
-            pipe_producer_free(pros[i]);
-            pipe_consumer_free(cons[i]);
-        }
-    }
-
-private:
-    pipe_t *p = pipe_new(sizeof(int), 0);
-
-    pipe_producer_t *pros[THREADS];
-    pipe_consumer_t *cons[THREADS];
-
-    mutex queueMutex;
-    bool stop;
-};
-
 int initTCP(int lport)
 {
     int sockfd;
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
-    pthread_t thread_id;
 
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -172,6 +141,7 @@ int handleServer(int argc, char *argv[])
             continue;
         }
 
+        ThreadPool threadPool(8);
         ThreadData data;
         data.params = strtol(params, &p, 10);
         data.sockfd = newsockfd;
@@ -180,15 +150,7 @@ int handleServer(int argc, char *argv[])
         data.lport = lport;
         data.client_addr = client_addr;
 
-        // Create Thread to handle this connection
-        pthread_t client_thread;
-        int create_thread = pthread_create(&client_thread, nullptr, handleConnection, &data);
-        if (create_thread != 0)
-        {
-            cout << "Failed to create thread" << endl;
-            close(newsockfd);
-            continue;
-        }
+        threadPool.enqueue(data);
     }
 
     close(sockfd);

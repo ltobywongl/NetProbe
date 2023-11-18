@@ -28,6 +28,85 @@ struct ThreadData
     int bufsize;
 };
 
+class ThreadPool
+{
+    public:
+        int numThreads;
+
+        ThreadPool(size_t threads) : stop(false)
+        {
+            numThreads = threads;
+            pthread_mutex_init(&queueMutex, nullptr);
+            pthread_cond_init(&condition, nullptr);
+
+            for (size_t i = 0; i < numThreads; i++) {
+                pthread_t thread;
+                pthread_create(&thread, nullptr, threadEntry, nullptr);
+                workers.push_back(thread);
+            }
+        }
+
+        ~ThreadPool()
+        {
+            pthread_mutex_lock(&queueMutex);
+            stop = true;
+            pthread_mutex_unlock(&queueMutex);
+            pthread_cond_broadcast(&condition);
+
+            for (pthread_t& thread : workers) {
+                pthread_join(thread, nullptr);
+            }
+
+            pthread_mutex_destroy(&queueMutex);
+            pthread_cond_destroy(&condition);
+        }
+
+        void enqueue(ThreadData data)
+        {
+            pthread_mutex_lock(&queueMutex);
+            tasks.push(data);
+            pthread_mutex_unlock(&queueMutex);
+            pthread_cond_signal(&condition);
+        }
+
+    private:
+        bool stop;
+
+        vector<pthread_t> workers;
+        queue<ThreadData> tasks;
+
+        pthread_mutex_t queueMutex;
+        pthread_cond_t condition;
+
+        static void* threadEntry(void* arg) {
+            ThreadPool* pool = static_cast<ThreadPool*>(arg);
+            pool->thread_handle();
+            return nullptr;
+        }
+
+        void thread_handle() {
+            while (true)
+            {
+                pthread_mutex_lock(&queueMutex);
+
+                while (tasks.empty() && !stop) {
+                    pthread_cond_wait(&condition, &queueMutex);
+                }
+
+                if (stop && tasks.empty()) {
+                    pthread_mutex_unlock(&queueMutex);
+                    break;
+                }
+                ThreadData data = tasks.front();
+                tasks.pop();
+
+                pthread_mutex_unlock(&queueMutex);
+
+                cout << "reading" << data.params << ' ' << data.sockfd << endl;
+            }
+        }
+};
+
 void *handleConnection(void *parameter)
 {
     ThreadData *data = reinterpret_cast<ThreadData *>(parameter);
