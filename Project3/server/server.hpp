@@ -22,143 +22,165 @@ using namespace std;
 
 class ThreadPool
 {
-    public:
-        ThreadPool(int threads) : stop(false)
+public:
+    ThreadPool(int threads) : stop(false)
+    {
+        numThreads = threads;
+        pthread_mutex_init(&queueMutex, nullptr);
+        pthread_cond_init(&condition, nullptr);
+
+        pthread_t pool_size_thread;
+        pthread_create(&pool_size_thread, nullptr, &ThreadPool::poolSizeEntry, this);
+
+        for (int i = 0; i < numThreads; i++)
         {
-            numThreads = threads;
-            pthread_mutex_init(&queueMutex, nullptr);
-            pthread_cond_init(&condition, nullptr);
+            pthread_t thread;
+            pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
+            workers.push_back(thread);
+        }
+    }
 
-            pthread_create()
+    ~ThreadPool()
+    {
+        pthread_mutex_lock(&queueMutex);
+        stop = true;
+        pthread_mutex_unlock(&queueMutex);
+        pthread_cond_broadcast(&condition);
 
-            for (int i = 0; i < numThreads; i++) {
-                pthread_t thread;
-                pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
-                workers.push_back(thread);
-            }
+        for (pthread_t &thread : workers)
+        {
+            pthread_join(thread, nullptr);
         }
 
-        ~ThreadPool()
+        pthread_mutex_destroy(&queueMutex);
+        pthread_cond_destroy(&condition);
+    }
+
+    void enqueue(ThreadData data)
+    {
+
+        pthread_mutex_lock(&runningTasksMutex);
+        if (numTasks == numThreads)
         {
+            cout << "Doubling pool size to " << numThreads * 2 << endl;
+            changePoolSize(numThreads * 2);
+        }
+        pthread_mutex_unlock(&runningTasksMutex);
+
+        pthread_mutex_lock(&queueMutex);
+        tasks.push(data);
+        pthread_mutex_unlock(&queueMutex);
+        pthread_cond_signal(&condition);
+    }
+
+    void changePoolSize(int newPoolSize)
+    {
+        pthread_mutex_lock(&queueMutex);
+
+        for (int i = numThreads; i < newPoolSize; i++)
+        {
+            pthread_t thread;
+            pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
+            workers.push_back(thread);
+        }
+
+        for (int i = numThreads; i < newPoolSize; i++)
+        {
+            pthread_cancel(workers[i]);
+            pthread_join(workers[i], nullptr);
+        }
+
+        numThreads = newPoolSize;
+        pthread_mutex_unlock(&queueMutex);
+    }
+
+private:
+    int numThreads = 8;
+    int numTasks = 0;
+    bool stop;
+
+    vector<pthread_t> workers;
+    queue<ThreadData> tasks;
+
+    pthread_mutex_t runningTasksMutex;
+    pthread_mutex_t queueMutex;
+    pthread_cond_t condition;
+
+    static void *threadEntry(void *arg)
+    {
+        ThreadPool *pool = static_cast<ThreadPool *>(arg);
+        pool->thread_handle();
+        return nullptr;
+    }
+
+    static void *poolSizeEntry(void *arg)
+    {
+        ThreadPool *pool = static_cast<ThreadPool *>(arg);
+        pool->pool_size_handle();
+        return nullptr;
+    }
+
+    void pool_size_handle()
+    {
+        long timeLog = -1;
+        ES_FlashTimer clock;
+        while (true)
+        {
+            cout << "NumTasks: " << numTasks << " / NumThreads: " << numThreads << endl;
+            long currentTime = clock.Elapsed();
+            if (timeLog != -1 && timeLog < currentTime - 60000 && numThreads > 1)
+            {
+                cout << "Halfing pool size from " << numThreads << " to " << floor(numThreads / 2) << endl;
+                changePoolSize(floor(numThreads / 2));
+                timeLog = clock.Elapsed();
+            }
+
+            if (timeLog == -1 && numTasks < numThreads / 2)
+            {
+                timeLog = clock.Elapsed();
+            }
+            if (numTasks >= numThreads / 2)
+            {
+                timeLog = -1;
+            }
+            sleep(3);
+        }
+    }
+
+    void thread_handle()
+    {
+        while (true)
+        {
+            // Change queue
             pthread_mutex_lock(&queueMutex);
-            stop = true;
+
+            while (tasks.empty() && !stop)
+            {
+                pthread_cond_wait(&condition, &queueMutex);
+            }
+
+            if (stop && tasks.empty())
+            {
+                pthread_mutex_unlock(&queueMutex);
+                break;
+            }
+            ThreadData data = tasks.front();
+            tasks.pop();
             pthread_mutex_unlock(&queueMutex);
-            pthread_cond_broadcast(&condition);
 
-            for (pthread_t& thread : workers) {
-                pthread_join(thread, nullptr);
-            }
-
-            pthread_mutex_destroy(&queueMutex);
-            pthread_cond_destroy(&condition);
-        }
-
-        void enqueue(ThreadData data)
-        {
-            
+            // Change number of running tasks count
             pthread_mutex_lock(&runningTasksMutex);
-            if (numTasks == numThreads) {
-                cout << "Doubling pool size" << endl;
-                changePoolSize(numThreads * 2);
-            }
+            numTasks++;
             pthread_mutex_unlock(&runningTasksMutex);
 
-            pthread_mutex_lock(&queueMutex);
-            tasks.push(data);
-            pthread_mutex_unlock(&queueMutex);
-            pthread_cond_signal(&condition);
+            handleConnection(&data);
+
+            // Change number of running tasks count
+            pthread_mutex_lock(&runningTasksMutex);
+            numTasks--;
+            pthread_mutex_unlock(&runningTasksMutex);
         }
-
-        void changePoolSize(int newPoolSize)
-        {
-            pthread_mutex_lock(&queueMutex);
-            numThreads = newPoolSize;
-
-            for (int i = workers.size(); i < numThreads; i++)
-            {
-                pthread_t thread;
-                pthread_create(&thread, nullptr, &ThreadPool::threadEntry, this);
-                workers[i] = thread;
-            }
-
-            for (int i = numThreads; i < workers.size(); i++)
-            {
-                pthread_cancel(workers[i]);
-                pthread_join(workers[i], nullptr);
-            }
-            pthread_mutex_unlock(&queueMutex);
-        }
-
-    private:
-        int numThreads;
-        int numTasks = 0;
-        bool stop;
-
-        vector<pthread_t> workers;
-        queue<ThreadData> tasks;
-
-        pthread_mutex_t runningTasksMutex;
-        pthread_mutex_t queueMutex;
-        pthread_cond_t condition;
-
-        static void* threadEntry(void* arg) {
-            ThreadPool* pool = static_cast<ThreadPool*>(arg);
-            pool->thread_handle();
-            return nullptr;
-        }
-
-        void pool_size_handle() {
-            long timeLog = -1;
-            ES_FlashTimer clock;
-            while (true) {
-                long currentTime = clock.Elapsed();
-                if (timeLog != -1 && timeLog < currentTime - 60000) {
-                    cout << "Halfing pool size" << endl;
-                    changePoolSize(ceil(numThreads / 2));
-                }
-                pthread_mutex_lock(&runningTasksMutex);
-                if (timeLog == -1 && numTasks < numThreads / 2) {
-                    timeLog = clock.Elapsed();
-                }
-                if (numTasks >= numThreads / 2) {
-                    timeLog = -1;
-                }
-                pthread_mutex_unlock(&runningTasksMutex);
-                
-            }
-        }
-
-        void thread_handle() {
-            while (true)
-            {
-                // Change queue
-                pthread_mutex_lock(&queueMutex);
-
-                while (tasks.empty() && !stop) {
-                    pthread_cond_wait(&condition, &queueMutex);
-                }
-
-                if (stop && tasks.empty()) {
-                    pthread_mutex_unlock(&queueMutex);
-                    break;
-                }
-                ThreadData data = tasks.front();
-                tasks.pop();
-                pthread_mutex_unlock(&queueMutex);
-
-                // Change number of running tasks count
-                pthread_mutex_lock(&runningTasksMutex);
-                numTasks++;
-                pthread_mutex_unlock(&runningTasksMutex);
-
-                handleConnection(&data);
-
-                // Change number of running tasks count
-                pthread_mutex_lock(&runningTasksMutex);
-                numTasks--;
-                pthread_mutex_unlock(&runningTasksMutex);
-            }
-        }
+    }
 };
 
 int initTCP(int lport)
