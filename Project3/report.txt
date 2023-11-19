@@ -1,4 +1,4 @@
-Project Experiments
+Project 3 Experiments
 
 1. Compare the achievable throughput, loss, and CPU utilization in Linux and Windows platforms.
 
@@ -51,17 +51,33 @@ Non-persistent mode has far lower latency.
 
 4. Compare the performance of TCP Cubic and TCP BBR under lossy networks (e.g., random packet loss rate > 0). Use tc to emulate the packet loss.
 
+Command for simulating loss rate: sudo tc qdisc add dev lo root netem loss 10%
+
+TCP Cubic: [Elapsed] 60042 ms, [Pkts] 67108, [Rate] 8.94 Mbps
+TCP BBR: [Elapsed] 60354 ms, [Pkts] 81562, [Rate] 10.81 Mbps
+
+BBR has a better performance under lossy network.
+
 ==============================================================================================================
 
 5. Please describe how the server makes sure to close all the sockets and indicate the specific line(s) of code responsible for this.
+
+All the connections are contantly checked. If there is an error or disconnection, it will be closed.
+
+The select functions are responsible for checking connections while doing the assigned job.
+select functions line: 
+    thread.hpp: 113, 238, 328
 
 ==============================================================================================================
 
 6. Please describe how you control the pool size and indicate the specific line(s) of code responsible for this.
 
 I have a separate thread created to keep monitoring the active tasks and change the pool size. It is created when the thread pool is created.
-The lines responsible for this is [TODO]
+The lines responsible for this is server.php line 34 that runs the pool_size_handle function in a thread. 
+The change pool size function "changePoolSize" is located at server.hpp line 77.
 
 ==============================================================================================================
 
 7. Do you disable Nagle algorithm? And indicate the specific line(s) of code responsible for this.
+
+Yes, server.hpp line 206-211.

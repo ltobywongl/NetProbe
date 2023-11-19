@@ -203,6 +203,13 @@ int initTCP(int lport, char *congestionAlgorithm)
         exit(EXIT_FAILURE);
     }
 
+    int flag = 1;
+    if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag)) == -1) {
+        perror("Error setting TCP_NODELAY");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(lport);
@@ -242,6 +249,7 @@ int handleServer(int argc, char *argv[])
     // Read options
     for (int i = 1; i < argc; i++)
     {
+        cout << i << endl;
         if (i + 1 < argc && argv[i][0] == '-')
         {
             if (strcmp(argv[i], "-tcpcca") == 0)
@@ -249,7 +257,7 @@ int handleServer(int argc, char *argv[])
                 congestion = argv[i + 1];
                 i++;
             }
-            if (strcmp(argv[i], "-lhost") == 0)
+            else if (strcmp(argv[i], "-lhost") == 0)
             {
                 lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
                 i++;
