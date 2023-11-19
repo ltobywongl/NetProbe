@@ -1,5 +1,6 @@
 
 #ifdef WIN32 // Windows
+#include <stdio.h>
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
@@ -31,10 +32,10 @@ int handleResponse(int argc, char *argv[])
     char *rhost = new char[256];
     strcpy(rhost, "localhost");
     int rport = 4180;
-    char *proto = new char[4];
-    strcpy(proto, "UDP");
+    char *persist = new char[4];
+    strcpy(persist, "no\0");
     int pktsize = 1000;
-    int pktrate = 1000;
+    int pktrate = 10;
     int pktnum = 0;
     int sbufsize = 65536;
     int rbufsize = 65536;
@@ -60,9 +61,9 @@ int handleResponse(int argc, char *argv[])
                 rport = strtol(argv[i + 1], &p, 10);
                 i++;
             }
-            else if (strcmp(argv[i], "-proto") == 0)
+            else if (strcmp(argv[i], "-persist") == 0)
             {
-                proto = argv[i + 1];
+                persist = argv[i + 1];
                 i++;
             }
             else if (strcmp(argv[i], "-pktsize") == 0)
@@ -108,6 +109,7 @@ int handleResponse(int argc, char *argv[])
         return -1;
     }
 
+    int sockfd;
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
 
@@ -116,31 +118,31 @@ int handleResponse(int argc, char *argv[])
     server_addr.sin_port = htons(rport);
     server_addr.sin_addr.s_addr = inet_addr(rhost);
 
-    SOCKET sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sockfd == INVALID_SOCKET)
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
     {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (const char *)&sbufsize, sizeof(sbufsize)) == SOCKET_ERROR)
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
     {
         perror("Error setting socket buffer size");
     }
 
     // Connect to the server
-    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR)
+    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
     {
         perror("Connection failed");
         exit(EXIT_FAILURE);
     }
 
-    if (strcmp(proto, "UDP") == 0)
+    if (strcmp(persist, "no") == 0)
     {
         // Get prot number
-        char buffer[8];
+        char buffer[pktsize];
         char *data = (char *)malloc(8 * sizeof(char));
-        sprintf(data, "10%d", pktrate);
+        sprintf(data, "20%d", pktsize);
         int r = send(sockfd, data, 7, 0);
         if (r <= 0)
         {
@@ -163,44 +165,51 @@ int handleResponse(int argc, char *argv[])
         }
 
         // Create new address
-        struct sockaddr_in server_udp_addr;
-        memset(&server_udp_addr, 0, sizeof(struct sockaddr_in));
+        struct sockaddr_in server_response_addr;
+        memset(&server_response_addr, 0, sizeof(struct sockaddr_in));
 
         // Configure server address
-        server_udp_addr.sin_family = AF_INET;
-        server_udp_addr.sin_port = htons(strtol(buffer, &p, 10));
-        server_udp_addr.sin_addr.s_addr = inet_addr(rhost);
+        server_response_addr.sin_family = AF_INET;
+        server_response_addr.sin_port = htons(strtol(buffer, &p, 10));
+        server_response_addr.sin_addr.s_addr = inet_addr(rhost);
 
-        // Create UDP socket
-        int udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (udpsockfd == -1)
-        {
-            perror("Socket creation failed");
-            exit(EXIT_FAILURE);
-        }
-
-        if (setsockopt(udpsockfd, SOL_SOCKET, SO_SNDBUF, (const char *)&sbufsize, sizeof(sbufsize)) == -1)
-        {
-            perror("Error setting socket buffer size");
-        }
-
-        // Send data
-        long msgsent = 0;
+        long messageResponse = 0;
         ES_FlashTimer clock;
-        int packetNum = 0;
         long previousClock = clock.Elapsed();
         long rateLimitClock = clock.Elapsed();
         long initialClock = clock.Elapsed();
-        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
-        while (pktnum == 0 || msgsent < pktnum)
+        int minTime = -1, maxTime = -1;
+        long cumTimeCost = 0, statTime = 0, messagesSentSecond = 0, cumJitter = 0;
+        while (pktnum == 0 || messageResponse < pktnum)
         {
             int bytes_sent = 0;
-            char *message = generateMessage(pktsize, msgsent + 1);
+            char *message = generateMessage(pktsize, messageResponse + 1);
+
+            // Make new connection everytime
+            // cout << "Initializing socket" << endl;
+            int tcpSockfd = socket(AF_INET, SOCK_STREAM, 0);
+            if (tcpSockfd == -1)
+            {
+                perror("Socket creation failed");
+                exit(EXIT_FAILURE);
+            }
+            if (setsockopt(tcpSockfd, SOL_SOCKET, SO_SNDBUF, (const char*)&sbufsize, sizeof(sbufsize)) == SOCKET_ERROR)
+            {
+                perror("Error setting socket buffer size");
+            }
+            if (connect(tcpSockfd, (const struct sockaddr *)&server_response_addr, sizeof(struct sockaddr)) == SOCKET_ERROR)
+            {
+                perror("Connection failed");
+                exit(EXIT_FAILURE);
+            }
+
+            // cout << "Sending message" << endl;
+            // Send message
             while (bytes_sent < pktsize)
             {
-                if ((bytesSentSecond <= pktrate) || (pktrate == 0))
+                if ((messagesSentSecond <= pktrate) || (pktrate == 0))
                 {
-                    int r = sendto(udpsockfd, message + bytes_sent, pktsize - bytes_sent, 0, (struct sockaddr *)&server_udp_addr, sizeof(server_udp_addr));
+                    int r = send(tcpSockfd, message + bytes_sent, pktsize - bytes_sent, 0);
                     if (r > 0)
                     {
                         bytes_sent += r;
@@ -208,42 +217,72 @@ int handleResponse(int argc, char *argv[])
                     else
                     {
                         perror("Send failed");
-                        exit(EXIT_FAILURE);
+                        break;
                     }
                 }
                 if (clock.Elapsed() - 1000 > rateLimitClock)
                 {
-                    bytesSentSecond = 0;
+                    messagesSentSecond = 0;
                     rateLimitClock = clock.Elapsed();
                 }
             }
-            bytesSentSecond += bytes_sent;
-            cumBytesSent += bytes_sent;
-            msgsent++;
+
+            // Waiting for response
+            // cout << "Waiting for response" << endl;
+            long bytesReceived = 0;
+            while (bytesReceived < pktsize)
+            {
+                int ret = recv(tcpSockfd, buffer, pktsize - bytesReceived, 0);
+                if (ret <= 0)
+                {
+                    cerr << "Receive failed" << endl;
+                    break;
+                }
+                else bytesReceived += ret;
+            }
+
+            messageResponse++;
             free(message);
+            close(tcpSockfd);
 
             // Handle time
             long currentClock = clock.Elapsed();
             double timeCost = currentClock - previousClock;
+
+            // Check max min time
+            if (timeCost < minTime || minTime == -1)
+            {
+                minTime = timeCost;
+            }
+            else if (timeCost > maxTime || maxTime == -1)
+            {
+                maxTime = timeCost;
+            }
+
             previousClock = currentClock;
             cumTimeCost += timeCost;
+            double averageTime = 0;
+            if (cumTimeCost > 0)
+                averageTime = cumTimeCost / messageResponse;
+            cumJitter += timeCost - averageTime;
 
             // Stats
             statTime += timeCost;
 
             if (statTime >= stat)
             {
-                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
-                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                double jitter = (double)cumJitter / messageResponse;
+                printf("Elapsed [%lds] Replies [%ld] Min [%dms] Max [%dms] Avg [%ldms] Jitter [%lfms]\n", (currentClock - initialClock) / 1000, messageResponse, minTime, maxTime, cumTimeCost / messageResponse, jitter);
                 statTime = 0;
             }
         }
     }
     else
     {
-        // TCP
+        // Persistant
+        char buffer[pktsize];
         char *data = (char *)malloc(8 * sizeof(char));
-        sprintf(data, "00%d", pktrate);
+        sprintf(data, "21%d", pktrate);
         int r = send(sockfd, data, 7, 0);
         if (r <= 0)
         {
@@ -251,64 +290,92 @@ int handleResponse(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        long msgsent = 0;
+        long messageResponse = 0;
         ES_FlashTimer clock;
-        int packetNum = 0;
         long previousClock = clock.Elapsed();
         long rateLimitClock = clock.Elapsed();
         long initialClock = clock.Elapsed();
-        long cumTimeCost = 0, cumBytesSent = 0, statTime = 0, bytesSentSecond = 0;
-        while (pktnum == 0 || msgsent < pktnum)
+        int minTime = -1, maxTime = -1;
+        long cumTimeCost = 0, statTime = 0, messagesSentSecond = 0, cumJitter = 0;
+        while (pktnum == 0 || messageResponse < pktnum)
         {
-            // Send data to the server
             int bytes_sent = 0;
-            char *message = generateMessage(pktsize, msgsent + 1);
+            char *message = generateMessage(pktsize, messageResponse + 1);
+
+            // Send message
             while (bytes_sent < pktsize)
             {
-                if ((bytesSentSecond < pktrate) || (pktrate == 0))
+                if ((messagesSentSecond <= pktrate) || (pktrate == 0))
                 {
                     int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
                     if (r > 0)
+                    {
                         bytes_sent += r;
+                    }
                     else
                     {
-                        free(message);
                         perror("Send failed");
-                        exit(EXIT_FAILURE);
+                        break;
                     }
                 }
                 if (clock.Elapsed() - 1000 > rateLimitClock)
                 {
-                    bytesSentSecond = 0;
+                    messagesSentSecond = 0;
                     rateLimitClock = clock.Elapsed();
                 }
             }
-            bytesSentSecond += bytes_sent;
-            cumBytesSent += bytes_sent;
-            msgsent++;
+
+            // Waiting for response
+            // cout << "Waiting for response" << endl;
+            long bytesReceived = 0;
+            while (bytesReceived < pktsize)
+            {
+                int ret = recv(sockfd, buffer, pktsize - bytesReceived, 0);
+                if (ret <= 0)
+                {
+                    cerr << "Receive failed" << endl;
+                    break;
+                }
+                else bytesReceived += ret;
+            }
+
+            messageResponse++;
             free(message);
 
             // Handle time
             long currentClock = clock.Elapsed();
             double timeCost = currentClock - previousClock;
+
+            // Check max min time
+            if (timeCost < minTime || minTime == -1)
+            {
+                minTime = timeCost;
+            }
+            else if (timeCost > maxTime || maxTime == -1)
+            {
+                maxTime = timeCost;
+            }
+
             previousClock = currentClock;
             cumTimeCost += timeCost;
+            double averageTime = 0;
+            if (cumTimeCost > 0)
+                averageTime = cumTimeCost / messageResponse;
+            cumJitter += timeCost - averageTime;
 
             // Stats
             statTime += timeCost;
 
             if (statTime >= stat)
             {
-                double throughput = (double)(cumBytesSent * 8) / (cumTimeCost * 1000);
-                printf("Receiver: [Elapsed] %ld ms, [Pkts] %ld, [Rate] %.2f Mbps\n", currentClock - initialClock, msgsent, throughput);
+                double jitter = (double)cumJitter / messageResponse;
+                printf("Elapsed [%lds] Replies [%ld] Min [%dms] Max [%dms] Avg [%ldms] Jitter [%lfms]\n", (currentClock - initialClock) / 1000, messageResponse, minTime, maxTime, cumTimeCost / messageResponse, jitter);
                 statTime = 0;
             }
         }
+
+        close(sockfd);
     }
-
-    closesocket(sockfd);
-    WSACleanup();
-
     return 0;
 }
 
