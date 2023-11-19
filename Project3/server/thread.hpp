@@ -26,6 +26,7 @@ struct ThreadData
     int lport;
     int pktrate;
     int bufsize;
+    char *congestion;
 };
 
 void handleConnection(ThreadData *data)
@@ -50,6 +51,14 @@ void handleConnection(ThreadData *data)
             if (tcpSockfd == -1) {
                 cerr << "Failed to create socket" << endl;
                 cout << "Closing TCP Socket..." << endl;
+                close(sockfd);
+                return;
+            }
+
+            if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, data->congestion, strlen(data->congestion)) == -1) {
+                perror("Error setting TCP congestion control");
+                cout << "Closing TCP Sockets..." << endl;
+                close(tcpSockfd);
                 close(sockfd);
                 return;
             }

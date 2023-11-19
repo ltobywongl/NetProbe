@@ -11,6 +11,7 @@
 #include <mutex>
 #include <queue>
 #include <functional>
+#include <netinet/tcp.h>
 #include "es_timer.hpp"
 #include "thread.hpp"
 
@@ -183,7 +184,7 @@ private:
     }
 };
 
-int initTCP(int lport)
+int initTCP(int lport, char *congestionAlgorithm)
 {
     int sockfd;
     struct sockaddr_in server_addr;
@@ -194,6 +195,11 @@ int initTCP(int lport)
     if (sockfd == -1)
     {
         perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, congestionAlgorithm, strlen(congestionAlgorithm)) == -1) {
+        perror("Error setting TCP congestion control");
         exit(EXIT_FAILURE);
     }
 
@@ -229,6 +235,8 @@ int handleServer(int argc, char *argv[])
     int sbufsize = 65536;
     int rbufsize = 65536;
     int poolsize = 8;
+    char *congestion = new char[32];
+    strcpy(congestion, "cubic");
     char *p;
 
     // Read options
@@ -236,6 +244,11 @@ int handleServer(int argc, char *argv[])
     {
         if (i + 1 < argc && argv[i][0] == '-')
         {
+            if (strcmp(argv[i], "-tcpcca") == 0)
+            {
+                congestion = argv[i + 1];
+                i++;
+            }
             if (strcmp(argv[i], "-lhost") == 0)
             {
                 lhost = (in_addr_t)strtol(argv[i + 1], &p, 10);
@@ -273,7 +286,7 @@ int handleServer(int argc, char *argv[])
     ThreadPool threadPool(poolsize);
 
     // ** Handle Socket **
-    int sockfd = initTCP(lport);
+    int sockfd = initTCP(lport, congestion);
 
     // Accept TCP connection to receive settings
     struct sockaddr_in client_addr;
@@ -323,6 +336,7 @@ int handleServer(int argc, char *argv[])
         data.bufsize = (data.params % 10) ? rbufsize : sbufsize;
         data.lport = lport;
         data.client_addr = client_addr;
+        data.congestion = congestion;
 
         threadPool.enqueue(data);
     }
