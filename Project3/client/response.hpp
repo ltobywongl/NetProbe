@@ -125,13 +125,13 @@ int handleResponse(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sbufsize, sizeof(sbufsize)) == -1)
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (char*)&sbufsize, sizeof(sbufsize)) == SOCKET_ERROR)
     {
         perror("Error setting socket buffer size");
     }
 
     // Connect to the server
-    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1)
+    if (connect(sockfd, (const struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == SOCKET_ERROR)
     {
         perror("Connection failed");
         exit(EXIT_FAILURE);
