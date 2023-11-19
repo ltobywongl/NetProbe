@@ -109,7 +109,7 @@ int handleResponse(int argc, char *argv[])
         return -1;
     }
 
-    int sockfd;
+    SOCKET sockfd;
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(struct sockaddr_in));
 
@@ -187,8 +187,8 @@ int handleResponse(int argc, char *argv[])
 
             // Make new connection everytime
             // cout << "Initializing socket" << endl;
-            int tcpSockfd = socket(AF_INET, SOCK_STREAM, 0);
-            if (tcpSockfd == -1)
+            SOCKET tcpSockfd = socket(AF_INET, SOCK_STREAM, 0);
+            if (tcpSockfd == INVALID_SOCKET)
             {
                 perror("Socket creation failed");
                 exit(EXIT_FAILURE);
@@ -376,6 +376,7 @@ int handleResponse(int argc, char *argv[])
 
         close(sockfd);
     }
+    WSACleanup();
     return 0;
 }
 
