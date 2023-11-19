@@ -453,7 +453,6 @@ int handleResponse(int argc, char *argv[])
         server_response_addr.sin_port = htons(strtol(buffer, &p, 10));
         server_response_addr.sin_addr.s_addr = inet_addr(rhost);
 
-        // Send data
         long messageResponse = 0;
         ES_FlashTimer clock;
         long previousClock = clock.Elapsed();
@@ -561,13 +560,98 @@ int handleResponse(int argc, char *argv[])
     else
     {
         // Persistant
+        char buffer[pktsize];
         char *data = (char *)malloc(8 * sizeof(char));
-        sprintf(data, "00%d", pktrate);
+        sprintf(data, "21%d", pktrate);
         int r = send(sockfd, data, 7, 0);
         if (r <= 0)
         {
             perror("Send failed");
             exit(EXIT_FAILURE);
+        }
+
+        long messageResponse = 0;
+        ES_FlashTimer clock;
+        long previousClock = clock.Elapsed();
+        long rateLimitClock = clock.Elapsed();
+        long initialClock = clock.Elapsed();
+        int minTime = -1, maxTime = -1;
+        long cumTimeCost = 0, statTime = 0, messagesSentSecond = 0, cumJitter = 0;
+        while (pktnum == 0 || messageResponse < pktnum)
+        {
+            int bytes_sent = 0;
+            char *message = generateMessage(pktsize, messageResponse + 1);
+
+            // Send message
+            while (bytes_sent < pktsize)
+            {
+                if ((messagesSentSecond <= pktrate) || (pktrate == 0))
+                {
+                    int r = send(sockfd, message + bytes_sent, pktsize - bytes_sent, 0);
+                    if (r > 0)
+                    {
+                        bytes_sent += r;
+                    }
+                    else
+                    {
+                        perror("Send failed");
+                        break;
+                    }
+                }
+                if (clock.Elapsed() - 1000 > rateLimitClock)
+                {
+                    messagesSentSecond = 0;
+                    rateLimitClock = clock.Elapsed();
+                }
+            }
+
+            // Waiting for response
+            // cout << "Waiting for response" << endl;
+            long bytesReceived = 0;
+            while (bytesReceived < pktsize)
+            {
+                int ret = recv(sockfd, buffer, pktsize - bytesReceived, 0);
+                if (ret <= 0)
+                {
+                    cerr << "Receive failed" << endl;
+                    break;
+                }
+                else bytesReceived += ret;
+            }
+
+            messageResponse++;
+            free(message);
+
+            // Handle time
+            long currentClock = clock.Elapsed();
+            double timeCost = currentClock - previousClock;
+
+            // Check max min time
+            if (timeCost < minTime || minTime == -1)
+            {
+                minTime = timeCost;
+            }
+            else if (timeCost > maxTime || maxTime == -1)
+            {
+                maxTime = timeCost;
+            }
+
+            previousClock = currentClock;
+            cumTimeCost += timeCost;
+            double averageTime = 0;
+            if (cumTimeCost > 0)
+                averageTime = cumTimeCost / messageResponse;
+            cumJitter += timeCost - averageTime;
+
+            // Stats
+            statTime += timeCost;
+
+            if (statTime >= stat)
+            {
+                double jitter = (double)cumJitter / messageResponse;
+                printf("Elapsed [%lds] Replies [%ld] Min [%dms] Max [%dms] Avg [%ldms] Jitter [%lfms]\n", (currentClock - initialClock) / 1000, messageResponse, minTime, maxTime, cumTimeCost / messageResponse, jitter);
+                statTime = 0;
+            }
         }
 
         close(sockfd);
