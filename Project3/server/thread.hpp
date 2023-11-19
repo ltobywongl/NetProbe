@@ -40,6 +40,8 @@ void handleConnection(ThreadData *data)
 
     if (params >= 20)
     {
+        // pktrate used for size in this mode
+        int pktsize = pktrate;
         if (params == 20)
         {
             // No Persist
@@ -66,7 +68,7 @@ void handleConnection(ThreadData *data)
                 return;
             }
 
-            if (listen(tcpSockfd, 5) == -1) {
+            if (listen(tcpSockfd, 3) == -1) {
                 cerr << "Failed to listen for connections" << endl;
                 cout << "Closing TCP Sockets..." << endl;
                 close(sockfd);
@@ -79,7 +81,7 @@ void handleConnection(ThreadData *data)
 
             struct sockaddr_in tcpAddress;
             socklen_t tcpAddressLength = sizeof(tcpAddress);
-            getsockname(sockfd, (struct sockaddr *)&tcpAddress, &tcpAddressLength);
+            getsockname(tcpSockfd, (struct sockaddr *)&tcpAddress, &tcpAddressLength);
             string msg = to_string(ntohs(tcpAddress.sin_port));
             send(sockfd, msg.c_str(), msg.length(), 0);
             cout << "Sent TCP port number to client: " << msg << endl;
@@ -87,33 +89,75 @@ void handleConnection(ThreadData *data)
             // Accepting and handling connection
             struct sockaddr_in client_addr;
             memset(&client_addr, 0, sizeof(struct sockaddr_in));
+            socklen_t client_addr_len = sizeof(client_addr);
             while (true)
             {
-                socklen_t client_addr_len = sizeof(client_addr);
-                int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
-                if (newsockfd < 0)
-                {
-                    perror("Accept failed");
-                    exit(EXIT_FAILURE);
-                }
+                fd_set readfds;
+                FD_ZERO(&readfds);
+                FD_SET(tcpSockfd, &readfds);
+                FD_SET(sockfd, &readfds);
 
-                char buffer[1];
-                int ret = recv(newsockfd, buffer, 1, 0);
-                if (ret <= 0)
+                struct timeval timeout;
+                timeout.tv_sec = 1;
+                timeout.tv_usec = 0;
+
+                int activity = select(max(sockfd, tcpSockfd) + 1, &readfds, nullptr, nullptr, &timeout);
+                if (activity < 0)
                 {
-                    printf("Client Disconnected or Error\n");
-                    exitFlag = 1;
-                    break;
-                }
-                int r = send(newsockfd, buffer, 1, 0);
-                if (r <= 0)
-                {
-                    cout << "Client Disconnected or Error" << endl;
-                    exitFlag = 1;
+                    perror("Select failed");
                     break;
                 }
 
-                close(newsockfd);
+                if (FD_ISSET(sockfd, &readfds))
+                {
+                    // TCP socket check
+                    int ret = recv(sockfd, buffer, data->bufsize, 0);
+                    if (ret <= 0)
+                    {
+                        printf("Client Disconnected or Error\n");
+                        exitFlag = 1;
+                        break;
+                    }
+                }
+                else
+                {
+                    // TCP socket error check
+                    int option = 0;
+                    socklen_t option_len = sizeof(option);
+                    if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &option_len) == -1 || option != 0)
+                    {
+                        perror("Client disconnected or Error");
+                        exitFlag = 1;
+                        break;
+                    }
+                }
+
+                if (FD_ISSET(tcpSockfd, &readfds))
+                {
+                    int newsockfd = accept(tcpSockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+                    if (newsockfd < 0)
+                    {
+                        perror("Accept failed");
+                        break;
+                    }
+
+                    char buffer[pktsize];
+                    int ret = recv(newsockfd, buffer, pktsize, 0);
+                    if (ret <= 0)
+                    {
+                        printf("Client Disconnected or Error\n");
+                        exitFlag = 1;
+                        break;
+                    }
+                    int r = send(newsockfd, buffer, pktsize, 0);
+                    if (r <= 0)
+                    {
+                        cout << "Client Disconnected or Error" << endl;
+                        exitFlag = 1;
+                        break;
+                    }
+                    close(newsockfd);
+                }
             }
             close(tcpSockfd);
         }
@@ -125,17 +169,17 @@ void handleConnection(ThreadData *data)
                 perror("Error setting socket buffer size");
             }
 
-            char buffer[1];
+            char buffer[pktsize];
             while (exitFlag == 0)
             {
-                int ret = recv(sockfd, buffer, 1, 0);
+                int ret = recv(sockfd, buffer, pktsize, 0);
                 if (ret <= 0)
                 {
                     printf("Client Disconnected or Error\n");
                     exitFlag = 1;
                     break;
                 }
-                int r = send(sockfd, buffer, 1, 0);
+                int r = send(sockfd, buffer, pktsize, 0);
                 if (r <= 0)
                 {
                     cout << "Client Disconnected or Error" << endl;

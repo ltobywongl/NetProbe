@@ -3,12 +3,12 @@
 #include <cstring>
 #include "send.hpp"
 #include "recv.hpp"
+#include "response.hpp"
 
 using namespace std;
 
 int main(int argc, char *argv[])
 {
-   int handleStatus = 0;
    if (argc == 1) {
       cout << "Please set the client mode" << endl;
       exit(EXIT_FAILURE);
@@ -16,11 +16,15 @@ int main(int argc, char *argv[])
    // Handle Mode
    if (strcmp(argv[1], "-send") == 0)
    {
-      handleStatus = handleSend(argc, argv);
+      handleSend(argc, argv);
    }
    else if (strcmp(argv[1], "-recv") == 0)
    {
-      handleStatus = handleRecv(argc, argv);
+      handleRecv(argc, argv);
+   }
+   else if (strcmp(argv[1], "-response") == 0)
+   {
+      handleResponse(argc, argv);
    }
 
    exit(0);

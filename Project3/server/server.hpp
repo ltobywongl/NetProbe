@@ -308,8 +308,8 @@ int handleServer(int argc, char *argv[])
         int pktrate = strtol((buffer + 2), &p, 10);
 
         if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 ||
-              strcmp(params, "00") == 0 || strcmp(params, "11") == 0) ||
-            strcmp(params, "20") == 0 || strcmp(params, "21") == 0)
+              strcmp(params, "00") == 0 || strcmp(params, "11") == 0 ||
+              strcmp(params, "20") == 0 || strcmp(params, "21") == 0))
         {
             cout << "Wrong parameter format" << endl;
             close(newsockfd);
