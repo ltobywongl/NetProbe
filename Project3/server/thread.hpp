@@ -43,7 +43,79 @@ void handleConnection(ThreadData *data)
         if (params == 20)
         {
             // No Persist
-            
+            // Setup new port for the connection
+            int tcpSockfd = socket(AF_INET, SOCK_STREAM, 0);
+            if (tcpSockfd == -1) {
+                cerr << "Failed to create socket" << endl;
+                cout << "Closing TCP Socket..." << endl;
+                close(sockfd);
+                return;
+            }
+
+            struct sockaddr_in serverAddress;
+            memset(&serverAddress, 0, sizeof(serverAddress));
+            serverAddress.sin_family = AF_INET;
+            serverAddress.sin_addr.s_addr = INADDR_ANY;
+            serverAddress.sin_port = htons(0);
+
+            if (bind(tcpSockfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1) {
+                cerr << "Failed to bind the socket" << endl;
+                cout << "Closing TCP Sockets..." << endl;
+                close(sockfd);
+                close(tcpSockfd);
+                return;
+            }
+
+            if (listen(tcpSockfd, 5) == -1) {
+                cerr << "Failed to listen for connections" << endl;
+                cout << "Closing TCP Sockets..." << endl;
+                close(sockfd);
+                close(tcpSockfd);
+                return;
+            }
+
+            setsockopt(tcpSockfd, SOL_SOCKET, SO_SNDBUF, &data->bufsize, sizeof(data->bufsize));
+            setsockopt(tcpSockfd, SOL_SOCKET, SO_RCVBUF, &data->bufsize, sizeof(data->bufsize));
+
+            struct sockaddr_in tcpAddress;
+            socklen_t tcpAddressLength = sizeof(tcpAddress);
+            getsockname(sockfd, (struct sockaddr *)&tcpAddress, &tcpAddressLength);
+            string msg = to_string(ntohs(tcpAddress.sin_port));
+            send(sockfd, msg.c_str(), msg.length(), 0);
+            cout << "Sent TCP port number to client: " << msg << endl;
+
+            // Accepting and handling connection
+            struct sockaddr_in client_addr;
+            memset(&client_addr, 0, sizeof(struct sockaddr_in));
+            while (true)
+            {
+                socklen_t client_addr_len = sizeof(client_addr);
+                int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+                if (newsockfd < 0)
+                {
+                    perror("Accept failed");
+                    exit(EXIT_FAILURE);
+                }
+
+                char buffer[1];
+                int ret = recv(newsockfd, buffer, 1, 0);
+                if (ret <= 0)
+                {
+                    printf("Client Disconnected or Error\n");
+                    exitFlag = 1;
+                    break;
+                }
+                int r = send(newsockfd, buffer, 1, 0);
+                if (r <= 0)
+                {
+                    cout << "Client Disconnected or Error" << endl;
+                    exitFlag = 1;
+                    break;
+                }
+
+                close(newsockfd);
+            }
+            close(tcpSockfd);
         }
         else
         {
