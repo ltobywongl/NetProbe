@@ -1,0 +1,9 @@
+Project Experiments
+
+1. Compare the achievable throughput, loss, and CPU utilization in Linux and Windows platforms.
+2. Compare the achievable throughput versus the number of client sessions, under both TCP and UDP.
+3. Compare the request mode performance under persistent versus non-persistent HTTP mode.
+4. Compare the performance of TCP Cubic and TCP BBR under lossy networks (e.g., random packet loss rate > 0). Use tc to emulate the packet loss.
+5. Please describe how the server makes sure to close all the sockets and indicate the specific line(s) of code responsible for this.
+6. Please describe how you control the pool size and indicate the specific line(s) of code responsible for this.
+7. Do you disable Nagle algorithm? And indicate the specific line(s) of code responsible for this.
