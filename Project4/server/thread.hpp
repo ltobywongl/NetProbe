@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cstdlib>
 #include <cstring>
 #include <sys/time.h>
@@ -31,6 +33,17 @@ struct ThreadData
     SSL_CTX **sslContext;
 };
 
+string readFileIntoString(const string& path) {
+    ifstream input_file(path);
+    if (!input_file.is_open()) {
+        cerr << "Cannot open file: '" << path << "'" << endl;
+        return "Cannot open file";
+    }
+    stringstream buffer;
+    buffer << input_file.rdbuf();
+    return buffer.str();
+}
+
 void handleConnection(ThreadData *data)
 {
     int params = data->params;
@@ -42,7 +55,7 @@ void handleConnection(ThreadData *data)
     socklen_t addr_len = sizeof(udp_addr);
 
     if (params >= 30) {
-        if (params == 32) {
+        if (params == 31) {
             SSL_CTX *sslContext = *(data->sslContext);
             SSL* ssl = SSL_new(sslContext);
             if (!ssl) {
@@ -64,12 +77,22 @@ void handleConnection(ThreadData *data)
                 cerr << "Failed to read request" << endl;
                 return;
             }
+
             string request(buffer, bytesRead);
-            if (bytesRead <= 0) {
-                cerr << "Failed to read request" << endl;
-                return;
-            }
-            string response = "HTTP/1.1 200 OK\r\n Content-Type: text/plain\r\n Content-Length: " + to_string(bytesRead) + "\r\n \r\n " + request;
+
+            int pathStartPos = request.find_first_of(' ') + 1;
+            int i = pathStartPos + 1;
+            while (request[i] != ' ') ++i;
+
+            string path = request.substr(pathStartPos, i - pathStartPos);
+
+            // Default to index.html if no file specified
+            if (path == "/") path = "index.html";
+            else if (path[path.length()-1] == '/') path = path + "index.html";
+
+            string file = readFileIntoString(path);
+
+            string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " + to_string(file.size()) + "\r\n\r\n" + file;
 
             int bytesSent = SSL_write(ssl, response.c_str(), response.length());
             if (bytesSent <= 0) {
@@ -78,12 +101,27 @@ void handleConnection(ThreadData *data)
             }
 
             close(sockfd);
-        } else if (params == 31) {
-            string response = "HTTP/1.1 200 OK\r\n"
-                                "Content-Type: text/plain\r\n"
-                                "Content-Length: 12\r\n"
-                                "\r\n"
-                                "Hello, World!";
+        } else if (params == 30) {
+            int bytesRead = read(sockfd, buffer, sizeof(buffer) - 1);
+            if (bytesRead <= 0) {
+                cerr << "Failed to read request" << endl;
+                return;
+            }
+
+            string request(buffer, bytesRead);
+
+            int pathStartPos = request.find_first_of(' ') + 1;
+            int i = pathStartPos + 1;
+            while (request[i] != ' ') ++i;
+
+            string path = request.substr(pathStartPos, i - pathStartPos);
+            // Default to index.html if no file specified
+            if (path == "/") path = "index.html";
+            else if (path[path.length()-1] == '/') path = path + "index.html";
+
+            string file = readFileIntoString(path);
+
+            string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " + to_string(file.size()) + "\r\n\r\n" + file;
 
             long bytesSent = send(sockfd, response.c_str(), response.length(), 0);
             if (bytesSent == -1) {

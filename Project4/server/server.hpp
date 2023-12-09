@@ -316,10 +316,45 @@ void *handleHTTPS(void *parameter)
         }
         
         ThreadData data;
-        data.params = 32;
+        data.params = 31;
         data.sockfd = newsockfd;
         data.pktrate = 0;
         data.sslContext = paramsData->sslContext;
+        data.bufsize = paramsData->rbufsize;
+        data.lport = paramsData->lport;
+        data.client_addr = client_addr;
+
+        (*(paramsData->threadPool)).enqueue(data);
+    }
+
+    close(sockfd);
+}
+
+void *handleHTTP(void *parameter)
+{
+    char *p;
+    ParamsData *paramsData = reinterpret_cast<ParamsData *>(parameter);
+    // ** Handle Socket **
+    int sockfd = initTCP(paramsData->lport);
+
+    while (true)
+    {
+        // Accept TCP connection
+        struct sockaddr_in client_addr;
+        memset(&client_addr, 0, sizeof(struct sockaddr_in));
+        socklen_t client_addr_len = sizeof(client_addr);
+
+        int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (newsockfd < 0)
+        {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        ThreadData data;
+        data.params = 30;
+        data.sockfd = newsockfd;
+        data.pktrate = 0;
         data.bufsize = paramsData->rbufsize;
         data.lport = paramsData->lport;
         data.client_addr = client_addr;
@@ -426,18 +461,34 @@ int handleServer(int argc, char *argv[])
         cout << "Failed to create connection thread" << endl;
     }
 
-    pthread_t http_tcp_thread;
-    ParamsData httpTcpParamsData;
-    httpTcpParamsData.sslContext = &sslContext;
-    httpTcpParamsData.threadPool = &threadPool;
-    httpTcpParamsData.lport = lhttpsport;
-    httpTcpParamsData.rbufsize = rbufsize;
-    httpTcpParamsData.sbufsize = sbufsize;
+    // HTTPS
+    pthread_t https_thread;
+    ParamsData httpsParamsData;
+    httpsParamsData.sslContext = &sslContext;
+    httpsParamsData.threadPool = &threadPool;
+    httpsParamsData.lport = lhttpsport;
+    httpsParamsData.rbufsize = rbufsize;
+    httpsParamsData.sbufsize = sbufsize;
 
-    int https_thread = pthread_create(&client_thread, nullptr, handleHTTPS, &httpTcpParamsData);
-    if (https_thread != 0)
+    int https_thread_id = pthread_create(&https_thread, nullptr, handleHTTPS, &httpsParamsData);
+    if (https_thread_id != 0)
     {
         cout << "Failed to create HTTPS thread" << endl;
+    }
+
+    // HTTP
+    pthread_t http_thread;
+    ParamsData httpParamsData;
+    httpParamsData.sslContext = &sslContext;
+    httpParamsData.threadPool = &threadPool;
+    httpParamsData.lport = lhttpport;
+    httpParamsData.rbufsize = rbufsize;
+    httpParamsData.sbufsize = sbufsize;
+
+    int http_thread_id = pthread_create(&http_thread, nullptr, handleHTTP, &httpParamsData);
+    if (http_thread_id != 0)
+    {
+        cout << "Failed to create HTTP thread" << endl;
     }
 
     while (true)

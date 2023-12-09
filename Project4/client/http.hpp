@@ -118,7 +118,12 @@ int handleHTTP(int argc, char *argv[])
         }
         
         int pathPos = url.find_first_of('/');
-        path = url.substr(pathPos);
+        if (pathPos == string::npos) {
+            path = "/";
+        } else {
+            path = url.substr(pathPos);
+            url = url.substr(0, pathPos);
+        }
     }
     else
     {
@@ -126,15 +131,15 @@ int handleHTTP(int argc, char *argv[])
         return 1;
     }
 
-    if (scheme == "https" && proto == "UDP") {
-        cerr << "SSL only work in TCP mode" << endl;
+    if (proto == "UDP") {
+        cerr << "TCP or QUIC only for http/https" << endl;
         return 1;
     }
 
     // Get address
     in_addr serverAddr = getAddressByURL(url);
 
-    cout << "Scheme: " << scheme << ", URL: " << url << ", Port: " << port << ", Address: " << inet_ntoa(serverAddr) << endl;
+    cout << "Scheme: " << scheme << ", URL: " << url << ", Path: " << path << ", Port: " << port << ", Address: " << inet_ntoa(serverAddr) << endl;
 
     if (proto == "TCP")
     {
@@ -246,46 +251,8 @@ int handleHTTP(int argc, char *argv[])
 
         cout << "Response: " << response << endl;
         close(sockfd);
-    }
-    else if (proto == "UDP")
-    {
-        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sockfd == -1)
-        {
-            cerr << "Failed to create socket" << endl;
-            return -1;
-        }
-
-        struct sockaddr_in serverAddress;
-        serverAddress.sin_family = AF_INET;
-        serverAddress.sin_port = htons(port);
-        serverAddress.sin_addr = serverAddr;
-
-        string request = "GET " + path + " HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
-        if (sendto(sockfd, request.c_str(), request.length(), 0, reinterpret_cast<struct sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
-        {
-            cerr << "Failed to send HTTP request" << endl;
-            close(sockfd);
-            return -1;
-        }
-
-        char buffer[4096];
-        string response;
-        socklen_t serverAddressLength = sizeof(serverAddress);
-        while (true)
-        {
-            memset(buffer, 0, sizeof(buffer));
-            ssize_t bytesRead = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, reinterpret_cast<struct sockaddr *>(&serverAddress), &serverAddressLength);
-            if (bytesRead <= 0)
-            {
-                perror("Failed to receive response");
-            }
-            response += buffer;
-        }
-
-        cout << "Response: " << response << endl;
-
-        close(sockfd);
+    } else if (proto == "QUIC") {
+        // TODO
     }
 
     return 0;
