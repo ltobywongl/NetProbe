@@ -149,6 +149,40 @@ int handleHTTP(int argc, char *argv[])
 
         cout << "Response: " << response << endl;
         close(sockfd);
+    } else if (proto == "UDP") {
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd == -1) {
+            cerr << "Failed to create socket" << endl;
+            return -1;
+        }
+
+        struct sockaddr_in serverAddress;
+        serverAddress.sin_family = AF_INET;
+        serverAddress.sin_port = htons(port);
+        serverAddress.sin_addr = serverAddr;
+
+        string request = "GET / HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
+        if (sendto(sockfd, request.c_str(), request.length(), 0, reinterpret_cast<struct sockaddr*>(&serverAddress), sizeof(serverAddress)) == -1) {
+            cerr << "Failed to send HTTP request" << endl;
+            close(sockfd);
+            return -1;
+        }
+
+        char buffer[4096];
+        string response;
+        socklen_t serverAddressLength = sizeof(serverAddress);
+        while (true) {
+            memset(buffer, 0, sizeof(buffer));
+            ssize_t bytesRead = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, reinterpret_cast<struct sockaddr*>(&serverAddress), &serverAddressLength);
+            if (bytesRead <= 0) {
+                break;
+            }
+            response += buffer;
+        }
+
+        cout << "Response: " << response << endl;
+
+        close(sockfd);
     }
 
     return 0;
