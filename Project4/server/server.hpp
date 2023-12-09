@@ -226,6 +226,8 @@ int handleServer(int argc, char *argv[])
     int stat = 500;
     in_addr_t lhost = INADDR_ANY;
     int lport = 4180;
+    int lhttpport = 4080;
+    int lhttpsport = 4081;
     int sbufsize = 65536;
     int rbufsize = 65536;
     int poolsize = 8;
@@ -244,6 +246,16 @@ int handleServer(int argc, char *argv[])
             else if (strcmp(argv[i], "-lport") == 0)
             {
                 lport = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-lhttpport") == 0)
+            {
+                lhttpport = strtol(argv[i + 1], &p, 10);
+                i++;
+            }
+            else if (strcmp(argv[i], "-lhttpsport") == 0)
+            {
+                lhttpsport = strtol(argv[i + 1], &p, 10);
                 i++;
             }
             else if (strcmp(argv[i], "-sbufsize") == 0)
