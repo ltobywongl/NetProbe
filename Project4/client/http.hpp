@@ -44,7 +44,7 @@ in_addr getAddressByURL(string url) {
 
 int handleHTTP(int argc, char *argv[])
 {
-    string url;
+    string url = "http://localhost";
     string file = "stdout";
     string proto = "UDP";
     string scheme = "http";
@@ -118,20 +118,17 @@ int handleHTTP(int argc, char *argv[])
             return -1;
         }
 
-        // Set up the server address structure
         struct sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_port = htons(port);
         serverAddress.sin_addr = serverAddr;
 
-        // Connect to the server
         if (connect(sockfd, reinterpret_cast<struct sockaddr*>(&serverAddress), sizeof(serverAddress)) == -1) {
             cerr << "Failed to connect to the server" << endl;
             close(sockfd);
             return -1;
         }
 
-        // Send the HTTP GET request
         string request = "GET / HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
         if (send(sockfd, request.c_str(), request.length(), 0) == -1) {
             cerr << "Failed to send HTTP request" << endl;
@@ -139,7 +136,6 @@ int handleHTTP(int argc, char *argv[])
             return -1;
         }
 
-        // Receive and print the response
         char buffer[32768];
         string response;
         while (true) {
@@ -152,6 +148,40 @@ int handleHTTP(int argc, char *argv[])
         }
 
         cout << "Response: " << response << endl;
+        close(sockfd);
+    } else if (proto == "UDP") {
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd == -1) {
+            cerr << "Failed to create socket" << endl;
+            return -1;
+        }
+
+        struct sockaddr_in serverAddress;
+        serverAddress.sin_family = AF_INET;
+        serverAddress.sin_port = htons(port);
+        serverAddress.sin_addr = serverAddr;
+
+        string request = "GET / HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
+        if (sendto(sockfd, request.c_str(), request.length(), 0, reinterpret_cast<struct sockaddr*>(&serverAddress), sizeof(serverAddress)) == -1) {
+            cerr << "Failed to send HTTP request" << endl;
+            close(sockfd);
+            return -1;
+        }
+
+        char buffer[4096];
+        string response;
+        socklen_t serverAddressLength = sizeof(serverAddress);
+        while (true) {
+            memset(buffer, 0, sizeof(buffer));
+            ssize_t bytesRead = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, reinterpret_cast<struct sockaddr*>(&serverAddress), &serverAddressLength);
+            if (bytesRead <= 0) {
+                break;
+            }
+            response += buffer;
+        }
+
+        cout << "Response: " << response << endl;
+
         close(sockfd);
     }
 
