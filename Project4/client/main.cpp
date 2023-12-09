@@ -4,6 +4,7 @@
 #include "send.hpp"
 #include "recv.hpp"
 #include "response.hpp"
+#include "http.hpp"
 
 using namespace std;
 
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
    }
    else if (strcmp(argv[1], "-http") == 0)
    {
-      handleResponse(argc, argv);
+      handleHTTP(argc, argv);
    }
 
    exit(0);
