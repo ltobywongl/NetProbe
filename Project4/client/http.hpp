@@ -49,6 +49,7 @@ in_addr getAddressByURL(string url)
 int handleHTTP(int argc, char *argv[])
 {
     string url = "http://localhost";
+    string path = "/";
     string file = "stdout";
     string proto = "UDP";
     string scheme = "http";
@@ -115,6 +116,9 @@ int handleHTTP(int argc, char *argv[])
                 cerr << "Invalid port number: " << portStr << ", falling back to 80 or 443" << endl;
             }
         }
+        
+        int pathPos = url.find_first_of('/');
+        path = url.substr(pathPos);
     }
     else
     {
@@ -154,7 +158,7 @@ int handleHTTP(int argc, char *argv[])
         }
 
         string response;
-        string request = "GET / HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
+        string request = "GET " + path + " HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
         if (scheme == "https")
         {
             SSL_library_init();
@@ -257,7 +261,7 @@ int handleHTTP(int argc, char *argv[])
         serverAddress.sin_port = htons(port);
         serverAddress.sin_addr = serverAddr;
 
-        string request = "GET / HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
+        string request = "GET " + path + " HTTP/1.1\r\nHost: " + url + "\r\nConnection: close\r\n\r\n";
         if (sendto(sockfd, request.c_str(), request.length(), 0, reinterpret_cast<struct sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
         {
             cerr << "Failed to send HTTP request" << endl;

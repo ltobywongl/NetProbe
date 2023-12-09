@@ -183,6 +183,14 @@ private:
     }
 };
 
+struct ParamsData
+{
+    ThreadPool *threadPool;
+    int lport;
+    int rbufsize;
+    int sbufsize;
+};
+
 int initTCP(int lport)
 {
     int sockfd;
@@ -217,6 +225,67 @@ int initTCP(int lport)
 
     cout << "Listening to incoming connection request ... " << endl;
     return sockfd;
+}
+
+void *handleConnection(void *parameter) {
+    char *p;
+    ParamsData *paramsData = reinterpret_cast<ParamsData *>(parameter);
+    // ** Handle Socket **
+    int sockfd = initTCP(paramsData->lport);
+
+    // Accept TCP connection to receive settings
+    struct sockaddr_in client_addr;
+    memset(&client_addr, 0, sizeof(struct sockaddr_in));
+    while (true)
+    {
+        socklen_t client_addr_len = sizeof(client_addr);
+        int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (newsockfd < 0)
+        {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+
+        char buffer[16];
+        memset(buffer, 0, sizeof(buffer));
+
+        // Receive data from the client
+        int bytesRead = recv(newsockfd, buffer, 16, 0);
+        if (bytesRead == 0)
+        {
+            cout << "Client disconnected." << endl;
+        }
+        else if (bytesRead < 0)
+        {
+            perror("Receive failed");
+        }
+
+        char params[3];
+        params[2] = '\0';
+        strncpy(params, buffer, 2);
+        int pktrate = strtol((buffer + 2), &p, 10);
+
+        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 ||
+              strcmp(params, "00") == 0 || strcmp(params, "11") == 0 ||
+              strcmp(params, "20") == 0 || strcmp(params, "21") == 0))
+        {
+            cout << "Wrong parameter format" << endl;
+            close(newsockfd);
+            continue;
+        }
+
+        ThreadData data;
+        data.params = strtol(params, &p, 10);
+        data.sockfd = newsockfd;
+        data.pktrate = pktrate;
+        data.bufsize = (data.params % 10) ? paramsData->rbufsize : paramsData->sbufsize;
+        data.lport = paramsData->lport;
+        data.client_addr = client_addr;
+
+        (*(paramsData->threadPool)).enqueue(data);
+    }
+
+    close(sockfd);
 }
 
 int handleServer(int argc, char *argv[])
@@ -284,62 +353,22 @@ int handleServer(int argc, char *argv[])
     // Thread Pool
     ThreadPool threadPool(poolsize);
 
-    // ** Handle Socket **
-    int sockfd = initTCP(lport);
+    pthread_t client_thread;
+    ParamsData paramsData;
+    paramsData.threadPool = &threadPool;
+    paramsData.lport = lport;
+    paramsData.rbufsize = rbufsize;
+    paramsData.sbufsize = sbufsize;
 
-    // Accept TCP connection to receive settings
-    struct sockaddr_in client_addr;
-    memset(&client_addr, 0, sizeof(struct sockaddr_in));
-    while (true)
+    int create_thread = pthread_create(&client_thread, nullptr, handleConnection, &paramsData);
+    if (create_thread != 0)
     {
-        socklen_t client_addr_len = sizeof(client_addr);
-        int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (newsockfd < 0)
-        {
-            perror("Accept failed");
-            exit(EXIT_FAILURE);
-        }
-
-        char buffer[16];
-        memset(buffer, 0, sizeof(buffer));
-
-        // Receive data from the client
-        int bytesRead = recv(newsockfd, buffer, 16, 0);
-        if (bytesRead == 0)
-        {
-            cout << "Client disconnected." << endl;
-        }
-        else if (bytesRead < 0)
-        {
-            perror("Receive failed");
-        }
-
-        char params[3];
-        params[2] = '\0';
-        strncpy(params, buffer, 2);
-        int pktrate = strtol((buffer + 2), &p, 10);
-
-        if (!(strcmp(params, "10") == 0 || strcmp(params, "01") == 0 ||
-              strcmp(params, "00") == 0 || strcmp(params, "11") == 0 ||
-              strcmp(params, "20") == 0 || strcmp(params, "21") == 0))
-        {
-            cout << "Wrong parameter format" << endl;
-            close(newsockfd);
-            continue;
-        }
-
-        ThreadData data;
-        data.params = strtol(params, &p, 10);
-        data.sockfd = newsockfd;
-        data.pktrate = pktrate;
-        data.bufsize = (data.params % 10) ? rbufsize : sbufsize;
-        data.lport = lport;
-        data.client_addr = client_addr;
-
-        threadPool.enqueue(data);
+        cout << "Failed to create connection thread" << endl;
     }
 
-    close(sockfd);
+    
 
+    while (true) {}
+    
     return 0;
 }
