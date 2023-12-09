@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include "es_timer.hpp"
 #include "udpsocket.hpp"
 
@@ -26,6 +28,7 @@ struct ThreadData
     int lport;
     int pktrate;
     int bufsize;
+    SSL_CTX **sslContext;
 };
 
 void handleConnection(ThreadData *data)
@@ -38,7 +41,59 @@ void handleConnection(ThreadData *data)
     struct sockaddr_in udp_addr;
     socklen_t addr_len = sizeof(udp_addr);
 
-    if (params >= 20)
+    if (params >= 30) {
+        if (params == 32) {
+            SSL_CTX *sslContext = *(data->sslContext);
+            SSL* ssl = SSL_new(sslContext);
+            if (!ssl) {
+                cerr << "Failed to create SSL object" << endl;
+                return;
+            }
+
+            SSL_set_fd(ssl, sockfd);
+
+            // Perform the SSL/TLS handshake
+            int sslHandshakeResult = SSL_accept(ssl);
+            if (sslHandshakeResult != 1) {
+                cerr << "Failed SSL/TLS handshake" << endl;
+                return;
+            }
+            
+            int bytesRead = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+            if (bytesRead <= 0) {
+                cerr << "Failed to read request" << endl;
+                return;
+            }
+            string request(buffer, bytesRead);
+            if (bytesRead <= 0) {
+                cerr << "Failed to read request" << endl;
+                return;
+            }
+            string response = "HTTP/1.1 200 OK\r\n Content-Type: text/plain\r\n Content-Length: " + to_string(bytesRead) + "\r\n \r\n " + request;
+
+            int bytesSent = SSL_write(ssl, response.c_str(), response.length());
+            if (bytesSent <= 0) {
+                cerr << "Failed to send response" << endl;
+                return;
+            }
+
+            close(sockfd);
+        } else if (params == 31) {
+            string response = "HTTP/1.1 200 OK\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 12\r\n"
+                                "\r\n"
+                                "Hello, World!";
+
+            long bytesSent = send(sockfd, response.c_str(), response.length(), 0);
+            if (bytesSent == -1) {
+                cerr << "Failed to send response" << endl;
+            }
+
+            close(sockfd);
+        }
+    }
+    else if (params >= 20)
     {
         // pktrate used for size in this mode
         int pktsize = pktrate;

@@ -18,6 +18,9 @@
 #define TIMEOUT_SECONDS 10
 #define THREADS 8
 
+#define CERT_FILE "certificate.crt"
+#define KEY_FILE "server.key"
+
 using namespace std;
 
 class ThreadPool
@@ -185,6 +188,7 @@ private:
 
 struct ParamsData
 {
+    SSL_CTX **sslContext;
     ThreadPool *threadPool;
     int lport;
     int rbufsize;
@@ -211,6 +215,7 @@ int initTCP(int lport)
 
     if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
+        cout << "Binding to port " << lport << " failed." << endl;
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
@@ -227,7 +232,8 @@ int initTCP(int lport)
     return sockfd;
 }
 
-void *handleConnection(void *parameter) {
+void *handleConnection(void *parameter)
+{
     char *p;
     ParamsData *paramsData = reinterpret_cast<ParamsData *>(parameter);
     // ** Handle Socket **
@@ -279,6 +285,42 @@ void *handleConnection(void *parameter) {
         data.sockfd = newsockfd;
         data.pktrate = pktrate;
         data.bufsize = (data.params % 10) ? paramsData->rbufsize : paramsData->sbufsize;
+        data.lport = paramsData->lport;
+        data.client_addr = client_addr;
+
+        (*(paramsData->threadPool)).enqueue(data);
+    }
+
+    close(sockfd);
+}
+
+void *handleHTTPS(void *parameter)
+{
+    char *p;
+    ParamsData *paramsData = reinterpret_cast<ParamsData *>(parameter);
+    // ** Handle Socket **
+    int sockfd = initTCP(paramsData->lport);
+
+    while (true)
+    {
+        // Accept TCP connection
+        struct sockaddr_in client_addr;
+        memset(&client_addr, 0, sizeof(struct sockaddr_in));
+        socklen_t client_addr_len = sizeof(client_addr);
+
+        int newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (newsockfd < 0)
+        {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        ThreadData data;
+        data.params = 32;
+        data.sockfd = newsockfd;
+        data.pktrate = 0;
+        data.sslContext = paramsData->sslContext;
+        data.bufsize = paramsData->rbufsize;
         data.lport = paramsData->lport;
         data.client_addr = client_addr;
 
@@ -350,6 +392,24 @@ int handleServer(int argc, char *argv[])
         }
     }
 
+    // OpenSSL
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+    SSL_CTX* sslContext = SSL_CTX_new(TLS_server_method());
+    if (!sslContext) {
+        cerr << "Failed to create SSL context" << endl;
+        return 1;
+    }
+
+    if (SSL_CTX_use_certificate_file(sslContext, CERT_FILE, SSL_FILETYPE_PEM) != 1 ||
+        SSL_CTX_use_PrivateKey_file(sslContext, KEY_FILE, SSL_FILETYPE_PEM) != 1) {
+        cerr << "Failed to load certificate or private key" << endl;
+        SSL_CTX_free(sslContext);
+        return 1;
+    }
+
     // Thread Pool
     ThreadPool threadPool(poolsize);
 
@@ -360,15 +420,33 @@ int handleServer(int argc, char *argv[])
     paramsData.rbufsize = rbufsize;
     paramsData.sbufsize = sbufsize;
 
-    int create_thread = pthread_create(&client_thread, nullptr, handleConnection, &paramsData);
-    if (create_thread != 0)
+    int connection_thread = pthread_create(&client_thread, nullptr, handleConnection, &paramsData);
+    if (connection_thread != 0)
     {
         cout << "Failed to create connection thread" << endl;
     }
 
-    
+    pthread_t http_tcp_thread;
+    ParamsData httpTcpParamsData;
+    httpTcpParamsData.sslContext = &sslContext;
+    httpTcpParamsData.threadPool = &threadPool;
+    httpTcpParamsData.lport = lhttpsport;
+    httpTcpParamsData.rbufsize = rbufsize;
+    httpTcpParamsData.sbufsize = sbufsize;
 
-    while (true) {}
-    
+    int https_thread = pthread_create(&client_thread, nullptr, handleHTTPS, &httpTcpParamsData);
+    if (https_thread != 0)
+    {
+        cout << "Failed to create HTTPS thread" << endl;
+    }
+
+    while (true)
+    {
+    }
+
+    SSL_CTX_free(sslContext);
+    ERR_free_strings();
+    EVP_cleanup();
+
     return 0;
 }
