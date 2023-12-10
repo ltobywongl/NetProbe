@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 #include <unistd.h>
 #include <cstring>
@@ -50,7 +51,7 @@ int handleHTTP(int argc, char *argv[])
 {
     string url = "http://localhost";
     string path = "/";
-    string file = "stdout";
+    string file = "/dev/stdout";
     string proto = "UDP";
     string scheme = "http";
     int port = 80;
@@ -116,11 +117,14 @@ int handleHTTP(int argc, char *argv[])
                 cerr << "Invalid port number: " << portStr << ", falling back to 80 or 443" << endl;
             }
         }
-        
+
         int pathPos = url.find_first_of('/');
-        if (pathPos == string::npos) {
+        if (pathPos == string::npos)
+        {
             path = "/";
-        } else {
+        }
+        else
+        {
             path = url.substr(pathPos);
             url = url.substr(0, pathPos);
         }
@@ -131,7 +135,8 @@ int handleHTTP(int argc, char *argv[])
         return 1;
     }
 
-    if (proto == "UDP") {
+    if (proto == "UDP")
+    {
         cerr << "TCP or QUIC only for http/https" << endl;
         return 1;
     }
@@ -215,10 +220,12 @@ int handleHTTP(int argc, char *argv[])
             }
 
             char buffer[32768];
-            while (true) {
+            while (true)
+            {
                 memset(buffer, 0, sizeof(buffer));
                 ssize_t bytesRead = SSL_read(ssl, buffer, sizeof(buffer) - 1);
-                if (bytesRead <= 0) {
+                if (bytesRead <= 0)
+                {
                     break;
                 }
                 response += buffer;
@@ -228,7 +235,9 @@ int handleHTTP(int argc, char *argv[])
             SSL_free(ssl);
             SSL_CTX_free(sslContext);
             close(sockfd);
-        } else {
+        }
+        else
+        {
             if (send(sockfd, request.c_str(), request.length(), 0) == -1)
             {
                 cerr << "Failed to send HTTP request" << endl;
@@ -249,9 +258,31 @@ int handleHTTP(int argc, char *argv[])
             }
         }
 
-        cout << "Response: " << response << endl;
+        if (file == "/dev/stdout")
+        {
+            cout << "Response: " << endl
+                 << response << endl;
+        }
+        else if (file == "/dev/null")
+        {
+            // Do nothing
+        }
+        else
+        {
+            ofstream outputFile(file.c_str());
+            if (!outputFile)
+            {
+                cerr << "Failed to open the output file." << endl;
+                return 1;
+            }
+
+            outputFile << response;
+            outputFile.close();
+        }
         close(sockfd);
-    } else if (proto == "QUIC") {
+    }
+    else if (proto == "QUIC")
+    {
         // TODO
     }
 

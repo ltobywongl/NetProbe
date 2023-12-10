@@ -89,6 +89,7 @@ void handleConnection(ThreadData *data)
             // Default to index.html if no file specified
             if (path == "/") path = "index.html";
             else if (path[path.length()-1] == '/') path = path + "index.html";
+            if (path[0] == '/') path = path.substr(1);
 
             string file = readFileIntoString(path);
 
@@ -118,6 +119,7 @@ void handleConnection(ThreadData *data)
             // Default to index.html if no file specified
             if (path == "/") path = "index.html";
             else if (path[path.length()-1] == '/') path = path + "index.html";
+            if (path[0] == '/') path = path.substr(1);
 
             string file = readFileIntoString(path);
 
