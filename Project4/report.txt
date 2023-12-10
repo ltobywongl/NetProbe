@@ -1,3 +1,4 @@
 Project Experiments
 
 1. Investigate the system performance impact of HTTPS over HTTP.
+For a transfer of a 1MB html file in my LAN, The HTTPS used 9ms and the HTTP used 4ms.

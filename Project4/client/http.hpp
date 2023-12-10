@@ -146,6 +146,10 @@ int handleHTTP(int argc, char *argv[])
 
     cout << "Scheme: " << scheme << ", URL: " << url << ", Path: " << path << ", Port: " << port << ", Address: " << inet_ntoa(serverAddr) << endl;
 
+    ES_FlashTimer clock;
+    long timeStart = clock.Elapsed();
+    cout << "Start: " << timeStart << endl;
+
     if (proto == "TCP")
     {
         int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -285,6 +289,9 @@ int handleHTTP(int argc, char *argv[])
     {
         // TODO
     }
+
+    long timeEnd = clock.Elapsed();
+    cout << "End: " << timeEnd << ", Diff: " << timeEnd - timeStart << endl;
 
     return 0;
 }
