@@ -1,7 +1,4 @@
-# Project for IERG4180
-# SID: 1155159363
-# Name: Wong Hong To
-## Report: Project4/report.txt
+# NetProbe Client for coursework
 ## Build
 ### Linux Server & Client
 - g++ ./Project4/server/main.cpp -o ./Project4/server/NetProbeServer -pthread
