@@ -1,4 +1,3 @@
-# NetProbe Client for coursework
 ## Build
 ### Linux Server & Client
 - g++ ./Project4/server/main.cpp -o ./Project4/server/NetProbeServer -pthread
